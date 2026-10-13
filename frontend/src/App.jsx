@@ -22,6 +22,9 @@ const LOKASI_OPTIONS = [
   'Gudang Kecil'
 ];
 
+const APP_BASE = '/bmn';
+const apiUrl = (p) => `${APP_BASE}${p.startsWith('/') ? p : '/' + p}`;
+
 function App() {
   // --- States ---
   const [currentPage, setCurrentPage] = useState('dashboard');
@@ -131,7 +134,7 @@ function App() {
   // --- Effects ---
   useEffect(() => {
     if (token) {
-      axios.get('/api/auth/me', {
+      axios.get(apiUrl('/api/auth/me'), {
         headers: { Authorization: `Bearer ${token}` }
       })
       .then(res => {
@@ -162,7 +165,7 @@ function App() {
   // --- API Calls ---
   const fetchDashboard = async () => {
     try {
-      const res = await axios.get('/api/barang/stats/summary');
+      const res = await axios.get(apiUrl('/api/barang/stats/summary'));
       if (res.data && res.data.data) {
         setDashboardData(res.data.data);
       }
@@ -174,7 +177,7 @@ function App() {
 
   const fetchBidangData = async (bidangName, searchQuery, pageNum) => {
     try {
-      const res = await axios.get(`/api/barang?bidang=${encodeURIComponent(bidangName)}&search=${encodeURIComponent(searchQuery)}&page=${pageNum}&limit=10`);
+      const res = await axios.get(apiUrl(`/api/barang?bidang=${encodeURIComponent(bidangName)}&search=${encodeURIComponent(searchQuery)}&page=${pageNum}&limit=10`));
       if (res.data && res.data.data) {
         setBidangData(res.data.data);
         setTotalPages(res.data.totalPages || 1);
@@ -187,7 +190,7 @@ function App() {
 
   const fetchPeminjamanData = async (status = peminjamanStatusFilter, bidang = peminjamanBidangFilter, searchStr = peminjamanSearch, pageNum = peminjamanPage) => {
     try {
-      let url = `/api/peminjaman?page=${pageNum}&limit=10`;
+      let url = apiUrl(`/api/peminjaman?page=${pageNum}&limit=10`);
       if (status && status !== 'Semua') url += `&status=${encodeURIComponent(status)}`;
       if (bidang && bidang !== 'Semua') url += `&bidang=${encodeURIComponent(bidang)}`;
       if (searchStr.trim()) url += `&search=${encodeURIComponent(searchStr.trim())}`;
@@ -208,7 +211,7 @@ function App() {
 
   const fetchBmnOptions = async () => {
     try {
-      const res = await axios.get('/api/barang?limit=300');
+      const res = await axios.get(apiUrl('/api/barang?limit=300'));
       if (res.data && res.data.data) {
         setBmnOptions(res.data.data);
       }
@@ -227,7 +230,7 @@ function App() {
   const handleDelete = async (id) => {
     if (!window.confirm('Apakah Anda yakin ingin menghapus data ini?')) return;
     try {
-      await axios.delete(`/api/barang/${id}`, {
+      await axios.delete(apiUrl(`/api/barang/${id}`), {
         headers: { Authorization: `Bearer ${token}` }
       });
       showToast('Data berhasil dihapus', 'success');
@@ -242,7 +245,7 @@ function App() {
     e.preventDefault();
     setLoginError('');
     try {
-      const res = await axios.post('/api/auth/login', loginForm);
+      const res = await axios.post(apiUrl('/api/auth/login'), loginForm);
       const tokenData = res.data.token || res.data.data?.token;
       const userData = res.data.user || res.data.data?.user;
       
@@ -296,7 +299,7 @@ function App() {
         formData.append('foto_barang', addFile);
       }
 
-      await axios.post('/api/barang', formData, {
+      await axios.post(apiUrl('/api/barang'), formData, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'multipart/form-data'
@@ -401,7 +404,7 @@ function App() {
         formData.append('foto_barang', addPinjamFile);
       }
 
-      await axios.post('/api/peminjaman', formData, {
+      await axios.post(apiUrl('/api/peminjaman'), formData, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'multipart/form-data'
@@ -432,7 +435,7 @@ function App() {
     e.preventDefault();
     if (!selectedReturnItem) return;
     try {
-      await axios.put(`/api/peminjaman/${selectedReturnItem.id}/kembali`, returnForm, {
+      await axios.put(apiUrl(`/api/peminjaman/${selectedReturnItem.id}/kembali`), returnForm, {
         headers: { Authorization: `Bearer ${token}` }
       });
       showToast(`Barang "${selectedReturnItem.nama_barang}" berhasil ditandai telah dikembalikan`, 'success');
@@ -448,7 +451,7 @@ function App() {
   const handleDeletePinjam = async (id) => {
     if (!window.confirm('Apakah Anda yakin ingin menghapus data peminjaman ini?')) return;
     try {
-      await axios.delete(`/api/peminjaman/${id}`, {
+      await axios.delete(apiUrl(`/api/peminjaman/${id}`), {
         headers: { Authorization: `Bearer ${token}` }
       });
       showToast('Data peminjaman berhasil dihapus', 'success');
@@ -642,10 +645,10 @@ function App() {
                     <td>
                       {item.foto_barang ? (
                         <img
-                          src={`/uploads/${item.foto_barang}`}
+                          src={apiUrl(`/uploads/${item.foto_barang}`)}
                           alt="Thumbnail"
                           className="thumbnail"
-                          onClick={() => setLightboxImage(`/uploads/${item.foto_barang}`)}
+                          onClick={() => setLightboxImage(apiUrl(`/uploads/${item.foto_barang}`))}
                         />
                       ) : <div className="no-image">No Image</div>}
                     </td>
@@ -811,10 +814,10 @@ function App() {
                       <td>
                         {item.foto_barang ? (
                           <img
-                            src={`/uploads/${item.foto_barang}`}
+                            src={apiUrl(`/uploads/${item.foto_barang}`)}
                             alt="Thumbnail"
                             className="thumbnail"
-                            onClick={() => setLightboxImage(`/uploads/${item.foto_barang}`)}
+                            onClick={() => setLightboxImage(apiUrl(`/uploads/${item.foto_barang}`))}
                           />
                         ) : <div className="no-image">No Image</div>}
                       </td>
@@ -1367,7 +1370,7 @@ function App() {
       {/* ===== HEADER: LOGO BMKG & ENLARGED PSIMKG ON TOP OF SISTEM INFORMASI BMN ===== */}
       <header className="app-header">
         <div className="header-container">
-          <img src="/logo-bmkg.png" alt="Logo BMKG" className="header-logo" />
+          <img src={apiUrl("/logo-bmkg.png")} alt="Logo BMKG" className="header-logo" />
           <div className="header-text-block">
             <h1 className="header-instansi-title">PSIMKG - PUSAT STANDARDISASI INSTRUMEN MKG</h1>
             <p className="header-instansi-sub">Badan Meteorologi, Klimatologi, dan Geofisika</p>
