@@ -8,7 +8,8 @@ const authRoutes = require('./routes/auth');
 const peminjamanRoutes = require('./routes/peminjaman');
 
 const app = express();
-const PORT = 8022;
+const HOST = process.env.HOST || '127.0.0.1';
+const PORT = Number(process.env.PORT || 8022);
 
 // Create uploads directory if not exists
 const uploadsDir = path.join(__dirname, 'uploads');
@@ -42,7 +43,7 @@ async function start() {
     await getDb();
     console.log('Database initialized successfully');
 
-    app.listen(PORT, () => {
+    app.listen(PORT, HOST, () => {
       console.log(`BMN PSIMKG Backend running on port ${PORT}`);
       console.log(`API: http://localhost:${PORT}/api/barang`);
       console.log(`Auth: http://localhost:${PORT}/api/auth`);
