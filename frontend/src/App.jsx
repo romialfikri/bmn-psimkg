@@ -22,7 +22,8 @@ const LOKASI_OPTIONS = [
   'Gudang Kecil'
 ];
 
-const APP_BASE = '/bmn';
+// Auto-detect base path: '/bmn' behind Apache on the server, '' on localhost:3022
+const APP_BASE = (typeof window !== 'undefined' && /^\/bmn(\/|$)/.test(window.location.pathname)) ? '/bmn' : '';
 const apiUrl = (p) => `${APP_BASE}${p.startsWith('/') ? p : '/' + p}`;
 
 function App() {
