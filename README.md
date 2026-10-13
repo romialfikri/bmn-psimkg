@@ -5,26 +5,23 @@ Aplikasi web untuk mengelola **Barang Milik Negara (BMN)** di lingkungan **PSIMK
 ## Fitur Utama
 
 - 📊 **Dashboard Ringkasan Eksekutif** - Total BMN, total nilai aset (Rupiah), sebaran BMN per bidang, 5 item terbaru, dan statistik per tahun.
-- 📑 **4 Halaman Bidang BMN**:
+- 📑 **Halaman Bidang BMN**:
   1. **Meteorologi**
   2. **Klimatologi**
   3. **Geofisika**
   4. **Tata Usaha**
+- 🤝 **Halaman Peminjaman Barang (Barang Dipinjam)**:
+  - Pencatatan peminjaman barang inventaris atau manual.
+  - **Fitur Dipinjamkan Oleh Siapa** (mencatat identitas petugas yang meminjamkan barang).
+  - Status aktif ("Sedang Dipinjam") dan riwayat ("Dikembalikan").
+  - Tombol aksi cepat pengembalian barang beserta tanggal dan catatan pengembalian.
 - 🔐 **Autentikasi Berbasis Peran (RBAC)**:
-  - Pengunjung hanya dapat melihat dan mencari data.
+  - Pengunjung umum hanya dapat melihat data.
   - Untuk menambah / upload data, pengguna harus login dengan akun bidang masing-masing.
   - **Hanya Administrator** yang berhak menghapus data BMN.
-- 🏷️ **Field Data Lengkap**:
-  - No BMN (kode aset)
-  - Nama Barang
-  - Bidang
-  - Tahun Perolehan
-  - Harga Barang (format Rupiah)
-  - Foto Barang (JPG, PNG, GIF, WebP, max 5MB)
-  - Keterangan
-  - Tanggal Upload (otomatis tersimpan)
-- 🔍 **Fitur Perbesar Foto (Lightbox)** - Klik foto thumbnail pada tabel untuk melihat gambar ukuran penuh secara interaktif.
-- 🔎 **Pencarian & Pagination** - Pencarian berdasarkan nama barang atau No BMN dengan navigasi per halaman.
+- 🏷️ **Field Data Lengkap**: No BMN, NUP, Nama Barang, Bidang, Tahun, Lokasi Ruangan, Harga Barang, Foto, Keterangan, Tanggal Upload.
+- 🔍 **Fitur Perbesar Foto (Lightbox)** - Klik foto thumbnail pada tabel untuk melihat gambar ukuran penuh.
+- 🔎 **Pencarian & Pagination** - Pencarian real-time berdasarkan nama barang, No BMN, peminjam, atau petugas.
 
 ---
 
@@ -33,57 +30,73 @@ Aplikasi web untuk mengelola **Barang Milik Negara (BMN)** di lingkungan **PSIMK
 | Username | Password | Role | Bidang Akses |
 |---|---|---|---|
 | `admin` | `admin123` | **Administrator** | Semua Bidang (Bisa Tambah & Hapus) |
-| `meteorologi` | `meteorologi123` | Operator | Meteorologi (Bisa Tambah) |
-| `klimatologi` | `klimatologi123` | Operator | Klimatologi (Bisa Tambah) |
-| `geofisika` | `geofisika123` | Operator | Geofisika (Bisa Tambah) |
-| `tatausaha` | `tatausaha123` | Operator | Tata Usaha (Bisa Tambah) |
+| `meteorologi` | `meteorologi123` | Operator | Meteorologi |
+| `klimatologi` | `klimatologi123` | Operator | Klimatologi |
+| `geofisika` | `geofisika123` | Operator | Geofisika |
+| `tatausaha` | `tatausaha123` | Operator | Tata Usaha |
 
 ---
 
 ## Arsitektur & Port
 
-- **Frontend**: React 18 + Vite (Port `3022`)
-- **Backend API**: Node.js + Express (Port `8022`)
+- **Frontend**: React 18 + Vite (Port `3022`) dijalankan via `server-static.js`
+- **Backend API**: Node.js + Express (Port `8022`) via `backend/server.js`
 - **Database**: SQLite (via `sql.js`, tersimpan di `backend/data/bmn.db`)
-- **Reverse Proxy**: Apache (Port `80` -> `3022` & `8022`)
-- **Process Manager**: PM2
+- **Reverse Proxy**: Apache (Port `80` -> `/bmn` ke Port `3022` & `/bmn/api` ke Port `8022`)
+- **Process Manager**: PM2 (`bmn-api` dan `bmn-web`)
 
 ---
 
-## Cara Menjalankan
+## 💻 Cara Menjalankan di Komputer Lokal (Windows)
 
-### Mode Development
-```bash
-# Terminal 1 - Backend
-cd backend
-npm run dev
-
-# Terminal 2 - Frontend
-cd frontend
-npm run dev
+Cukup **klik dua kali** file:
 ```
-Akses di browser: **http://localhost:3022**
+jalankan-lokal.bat
+```
+Script akan otomatis menyalakan Backend API (port 8022), Frontend Web (port 3022), dan langsung membuka browser di **http://localhost:3022**.
 
-### Mode Production dengan PM2
+---
+
+## 🐧 Cara Deploy di Server (Ubuntu 24.04 di `/var/www/bmn`)
+
+Aplikasi dirancang agar dapat di-deploy secara **live hanya dengan pull git**:
+
+### 1. Masuk ke direktori dan pull kode terbaru
 ```bash
-# 1. Build Frontend
-cd frontend
+cd /var/www/bmn
+git pull origin main
+```
+
+### 2. Install dependencies & build frontend
+```bash
+npm install
 npm run build
-cd ..
-
-# 2. Jalankan PM2
-pm2 start ecosystem.config.cjs
-pm2 save
-pm2 startup
 ```
 
-### Konfigurasi Apache (Server BMKG)
+### 3. Jalankan / Restart layanan PM2
+```bash
+pm2 start ecosystem.config.cjs
+# atau jika sudah pernah jalan:
+pm2 restart ecosystem.config.cjs
+pm2 save
+```
+
+Layanan PM2 yang berjalan:
+- `bmn-api`: Backend API Express (Port 8022)
+- `bmn-web`: Frontend Web Static Server (Port 3022)
+
+### 4. Konfigurasi Apache Reverse Proxy
+Salin konfigurasi `apache-bmn.conf`:
 ```bash
 sudo cp apache-bmn.conf /etc/apache2/sites-available/bmn.conf
 sudo a2enmod proxy proxy_http rewrite headers
 sudo a2ensite bmn.conf
 sudo systemctl restart apache2
 ```
+
+Aplikasi dapat diakses melalui:
+- **http://[domain-atau-ip]/bmn** (Production di server)
+- **http://localhost:3022** (Lokal)
 
 ---
 
