@@ -29,13 +29,52 @@ body {
 
 /* ===== HEADER ===== */
 .app-header {
-  background: linear-gradient(135deg, var(--primary), var(--primary-light));
+  background: linear-gradient(135deg, #002244, #003366, #004d99);
   color: #fff;
-  padding: 1.5rem 2rem;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  padding: 1.25rem 2rem;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.2);
 }
-.header-content h1 { font-size: 1.6rem; margin-bottom: 0.2rem; }
-.header-content p { font-size: 0.9rem; opacity: 0.85; }
+.header-container {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  max-width: 1300px;
+  margin: 0 auto;
+}
+.header-logo {
+  height: 75px;
+  width: auto;
+  object-fit: contain;
+  flex-shrink: 0;
+  filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.25));
+}
+.header-text-block {
+  display: flex;
+  flex-direction: column;
+}
+.header-instansi-title {
+  font-size: 1.6rem;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  color: #ffffff;
+  text-transform: uppercase;
+  margin-bottom: 0.1rem;
+  line-height: 1.2;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.25);
+}
+.header-instansi-sub {
+  font-size: 0.85rem;
+  color: #bde0fe;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+  margin-bottom: 0.3rem;
+}
+.header-app-title {
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: #ffd166;
+  letter-spacing: 0.3px;
+}
 
 /* ===== NAVIGATION BAR ===== */
 .nav-bar {
@@ -475,9 +514,131 @@ body {
   color: #999;
   font-style: italic;
 }
-.harga-cell { text-align: right; font-family: 'Courier New', monospace; white-space: nowrap; font-size: 0.85rem; }
 .date-cell { white-space: nowrap; font-size: 0.85rem; color: var(--text-light); }
-.nobmn-cell { font-family: monospace; font-size: 0.85rem; }
+.nobmn-cell { font-family: monospace; font-size: 0.85rem; font-weight: 600; color: #1e3a8a; }
+.nup-cell { font-family: monospace; font-size: 0.85rem; font-weight: 600; color: #0d9488; }
+.lokasi-badge {
+  display: inline-block;
+  padding: 0.2rem 0.55rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  background-color: #f0fdf4;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+  white-space: nowrap;
+}
+
+/* ===== PEMINJAMAN BADGES & STYLES ===== */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.status-badge.dipinjam {
+  background: #fff3cd;
+  color: #856404;
+  border: 1px solid #ffeeba;
+}
+.status-badge.dikembalikan {
+  background: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+.status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.status-badge.dipinjam .status-dot { background: #e0a800; }
+.status-badge.dikembalikan .status-dot { background: #28a745; }
+
+/* Dipinjamkan Oleh Highlight */
+.petugas-pemberi {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: #e8f4fd;
+  color: #004d99;
+  padding: 0.35rem 0.7rem;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  border: 1px solid #b8daff;
+}
+.petugas-icon {
+  font-size: 0.9rem;
+}
+
+.peminjam-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.peminjam-nama {
+  font-weight: 600;
+  color: var(--text);
+}
+.peminjam-kontak {
+  font-size: 0.8rem;
+  color: var(--text-light);
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+/* Filter Tabs */
+.filter-tabs {
+  display: inline-flex;
+  background: #e9ecef;
+  padding: 0.25rem;
+  border-radius: var(--radius);
+  gap: 0.25rem;
+}
+.filter-tab {
+  padding: 0.45rem 0.9rem;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-light);
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.filter-tab:hover {
+  color: var(--primary);
+}
+.filter-tab.active {
+  background: #fff;
+  color: var(--primary);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+.filter-count {
+  font-size: 0.75rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 10px;
+  background: #dee2e6;
+  color: #495057;
+}
+.filter-tab.active .filter-count {
+  background: var(--secondary);
+  color: #fff;
+}
+
+.stat-card.dipinjam { border-left-color: #ff9800; }
+.stat-card.dikembalikan { border-left-color: #28a745; }
 
 /* ===== ANIMATIONS ===== */
 @keyframes fadeIn {
@@ -491,6 +652,11 @@ body {
 
 /* ===== RESPONSIVE ===== */
 @media (max-width: 768px) {
+  .app-header { padding: 1rem; }
+  .header-container { flex-direction: column; text-align: center; gap: 0.75rem; }
+  .header-instansi-title { font-size: 1.2rem; }
+  .header-app-title { font-size: 0.95rem; }
+  .header-logo { height: 60px; }
   .nav-bar { flex-direction: column; padding: 0; }
   .nav-links { overflow-x: auto; width: 100%; }
   .nav-link { padding: 0.75rem 1rem; font-size: 0.85rem; white-space: nowrap; }
@@ -499,10 +665,10 @@ body {
   .search-box input { width: 100%; }
   .stats-grid { grid-template-columns: 1fr 1fr; }
   .app-main { padding: 1rem; }
-  .header-content h1 { font-size: 1.2rem; }
   .form-row { grid-template-columns: 1fr; }
   .login-card { padding: 1.5rem; }
   .stat-card .stat-value { font-size: 1.4rem; }
+  .filter-tabs { width: 100%; overflow-x: auto; }
 }
 
 @media (max-width: 480px) {

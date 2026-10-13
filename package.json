@@ -1,0 +1,16 @@
+{
+  "name": "bmn-psimkg",
+  "version": "2.0.0",
+  "description": "Aplikasi Sistem Informasi BMN - PSIMKG BMKG",
+  "private": true,
+  "scripts": {
+    "start": "pm2 start ecosystem.config.cjs",
+    "stop": "pm2 stop ecosystem.config.cjs",
+    "restart": "pm2 restart ecosystem.config.cjs",
+    "build": "cd frontend && npm run build",
+    "install:all": "npm --prefix backend install && npm --prefix frontend install"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}

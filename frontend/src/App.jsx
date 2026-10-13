@@ -1,6 +1,26 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import './App.css';
+
+const LOKASI_OPTIONS = [
+  'Ruang Kepala Pusat',
+  'Ruang Meteorologi',
+  'Ruang Klimatologi',
+  'Ruang Geofisika',
+  'Ruang Tata Usaha',
+  'Ruang KTU',
+  'Ruang PPK',
+  'Ruang Bendahara',
+  'Ruang Koordinator Bidang Meteorologi',
+  'Ruang Koordinator Bidang Klimatologi',
+  'Ruang Koordinator Bidang Geofisika',
+  'Ruang Rapat Besar',
+  'Ruang Rapat Kecil',
+  'Greenmind',
+  'Sekretariat',
+  'Gudang Besar',
+  'Gudang Kecil'
+];
 
 function App() {
   // --- States ---
@@ -22,6 +42,41 @@ function App() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
+  // Peminjaman Page State
+  const [peminjamanData, setPeminjamanData] = useState([]);
+  const [peminjamanStats, setPeminjamanStats] = useState({ totalSemua: 0, totalDipinjam: 0, totalDikembalikan: 0 });
+  const [peminjamanStatusFilter, setPeminjamanStatusFilter] = useState('Semua');
+  const [peminjamanBidangFilter, setPeminjamanBidangFilter] = useState('Semua');
+  const [peminjamanSearch, setPeminjamanSearch] = useState('');
+  const [peminjamanPage, setPeminjamanPage] = useState(1);
+  const [peminjamanTotalPages, setPeminjamanTotalPages] = useState(1);
+  const [isAddPinjamModalOpen, setIsAddPinjamModalOpen] = useState(false);
+  const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
+  const [selectedReturnItem, setSelectedReturnItem] = useState(null);
+  const [returnForm, setReturnForm] = useState({
+    tgl_kembali_aktual: new Date().toISOString().split('T')[0],
+    catatan_pengembalian: ''
+  });
+  const [bmnOptions, setBmnOptions] = useState([]);
+  const [addPinjamForm, setAddPinjamForm] = useState({
+    pilihDariBmn: true,
+    barang_id: '',
+    no_bmn: '',
+    nup: '',
+    nama_barang: '',
+    bidang: 'Meteorologi',
+    nama_peminjam: '',
+    kontak_peminjam: '',
+    dipinjamkan_oleh: '',
+    tgl_pinjam: new Date().toISOString().split('T')[0],
+    tgl_kembali_rencana: '',
+    keperluan: '',
+    catatan: ''
+  });
+  const [addPinjamFile, setAddPinjamFile] = useState(null);
+  const [addPinjamPreview, setAddPinjamPreview] = useState('');
+  const [isSubmittingPinjam, setIsSubmittingPinjam] = useState(false);
+
   // Login State
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
   const [loginError, setLoginError] = useState('');
@@ -29,9 +84,10 @@ function App() {
   // Add Item State
   const [addForm, setAddForm] = useState({
     no_bmn: '',
+    nup: '',
     nama_barang: '',
     tahun_barang: '',
-    harga_barang: '',
+    lokasi_barang: '',
     keterangan: '',
     bidang: ''
   });
@@ -98,8 +154,10 @@ function App() {
       fetchDashboard();
     } else if (['meteorologi', 'klimatologi', 'geofisika', 'tatausaha'].includes(currentPage)) {
       fetchBidangData(getBidangName(currentPage), search, page);
+    } else if (currentPage === 'peminjaman') {
+      fetchPeminjamanData(peminjamanStatusFilter, peminjamanBidangFilter, peminjamanSearch, peminjamanPage);
     }
-  }, [currentPage, page]);
+  }, [currentPage, page, peminjamanPage, peminjamanStatusFilter, peminjamanBidangFilter]);
 
   // --- API Calls ---
   const fetchDashboard = async () => {
@@ -127,7 +185,39 @@ function App() {
     }
   };
 
-  // --- Event Handlers ---
+  const fetchPeminjamanData = async (status = peminjamanStatusFilter, bidang = peminjamanBidangFilter, searchStr = peminjamanSearch, pageNum = peminjamanPage) => {
+    try {
+      let url = `/api/peminjaman?page=${pageNum}&limit=10`;
+      if (status && status !== 'Semua') url += `&status=${encodeURIComponent(status)}`;
+      if (bidang && bidang !== 'Semua') url += `&bidang=${encodeURIComponent(bidang)}`;
+      if (searchStr.trim()) url += `&search=${encodeURIComponent(searchStr.trim())}`;
+
+      const res = await axios.get(url);
+      if (res.data && res.data.success) {
+        setPeminjamanData(res.data.data);
+        setPeminjamanTotalPages(res.data.totalPages || 1);
+        if (res.data.stats) {
+          setPeminjamanStats(res.data.stats);
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching peminjaman data:', err);
+      showToast('Gagal memuat data peminjaman barang', 'error');
+    }
+  };
+
+  const fetchBmnOptions = async () => {
+    try {
+      const res = await axios.get('/api/barang?limit=300');
+      if (res.data && res.data.data) {
+        setBmnOptions(res.data.data);
+      }
+    } catch (err) {
+      console.error('Error fetching BMN items for dropdown:', err);
+    }
+  };
+
+  // --- Event Handlers: Barang ---
   const handleSearchSubmit = (e) => {
     e.preventDefault();
     setPage(1);
@@ -153,21 +243,13 @@ function App() {
     setLoginError('');
     try {
       const res = await axios.post('/api/auth/login', loginForm);
-      if (res.data && res.data.token) {
-        // Handle common structure { token, user } or { data: { token, user } }
-        const tokenData = res.data.token || res.data.data?.token;
-        const userData = res.data.user || res.data.data?.user;
-        
+      const tokenData = res.data.token || res.data.data?.token;
+      const userData = res.data.user || res.data.data?.user;
+      
+      if (tokenData && userData) {
         setToken(tokenData);
         localStorage.setItem('bmn_token', tokenData);
         setUser(userData);
-        showToast('Login berhasil', 'success');
-        setCurrentPage('dashboard');
-        setLoginForm({ username: '', password: '' });
-      } else if (res.data.data) {
-        setToken(res.data.data.token);
-        localStorage.setItem('bmn_token', res.data.data.token);
-        setUser(res.data.data.user);
         showToast('Login berhasil', 'success');
         setCurrentPage('dashboard');
         setLoginForm({ username: '', password: '' });
@@ -187,14 +269,20 @@ function App() {
 
   const handleAddSubmit = async (e) => {
     e.preventDefault();
+    if (!addForm.no_bmn?.trim() || !addForm.nup?.trim() || !addForm.lokasi_barang?.trim() || !addForm.nama_barang?.trim() || !addForm.tahun_barang) {
+      showToast('No BMN, NUP, Lokasi Barang, Nama Barang, dan Tahun Barang wajib diisi', 'error');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const formData = new FormData();
-      formData.append('no_bmn', addForm.no_bmn);
-      formData.append('nama_barang', addForm.nama_barang);
+      formData.append('no_bmn', addForm.no_bmn.trim());
+      formData.append('nup', addForm.nup.trim());
+      formData.append('nama_barang', addForm.nama_barang.trim());
       formData.append('tahun_barang', addForm.tahun_barang);
-      formData.append('harga_barang', addForm.harga_barang);
-      formData.append('keterangan', addForm.keterangan);
+      formData.append('lokasi_barang', addForm.lokasi_barang.trim());
+      formData.append('keterangan', addForm.keterangan || '');
 
       let submitBidang = addForm.bidang;
       if (user && user.role !== 'admin') {
@@ -215,57 +303,211 @@ function App() {
         }
       });
 
-      showToast('Data berhasil ditambahkan', 'success');
+      showToast('Data BMN berhasil ditambahkan', 'success');
       setIsAddModalOpen(false);
-      setAddForm({ no_bmn: '', nama_barang: '', tahun_barang: '', harga_barang: '', keterangan: '', bidang: '' });
+      setAddForm({ no_bmn: '', nup: '', nama_barang: '', tahun_barang: '', lokasi_barang: '', keterangan: '', bidang: '' });
       setAddFile(null);
       setAddPreview('');
       
       if (['meteorologi', 'klimatologi', 'geofisika', 'tatausaha'].includes(currentPage)) {
         fetchBidangData(getBidangName(currentPage), search, page);
+      } else if (currentPage === 'dashboard') {
+        fetchDashboard();
       }
     } catch (err) {
       console.error('Error adding data:', err);
-      showToast(err.response?.data?.message || 'Gagal menambah data', 'error');
+      showToast(err.response?.data?.error || err.response?.data?.message || 'Gagal menambah data', 'error');
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  // --- Event Handlers: Peminjaman ---
+  const handlePeminjamanSearchSubmit = (e) => {
+    e.preventDefault();
+    setPeminjamanPage(1);
+    fetchPeminjamanData(peminjamanStatusFilter, peminjamanBidangFilter, peminjamanSearch, 1);
+  };
+
+  const openAddPinjamModal = () => {
+    setAddPinjamForm({
+      pilihDariBmn: true,
+      barang_id: '',
+      no_bmn: '',
+      nup: '',
+      nama_barang: '',
+      bidang: user?.bidang && user?.bidang !== 'Semua' ? user.bidang : 'Meteorologi',
+      nama_peminjam: '',
+      kontak_peminjam: '',
+      dipinjamkan_oleh: user?.nama || '',
+      tgl_pinjam: new Date().toISOString().split('T')[0],
+      tgl_kembali_rencana: '',
+      keperluan: '',
+      catatan: ''
+    });
+    setAddPinjamFile(null);
+    setAddPinjamPreview('');
+    setIsAddPinjamModalOpen(true);
+    fetchBmnOptions();
+  };
+
+  const handleSelectBmnItem = (barangId) => {
+    if (!barangId) {
+      setAddPinjamForm(prev => ({
+        ...prev,
+        barang_id: '',
+        no_bmn: '',
+        nup: '',
+        nama_barang: ''
+      }));
+      return;
+    }
+    const found = bmnOptions.find(b => String(b.id) === String(barangId));
+    if (found) {
+      setAddPinjamForm(prev => ({
+        ...prev,
+        barang_id: found.id,
+        no_bmn: found.no_bmn || '',
+        nup: found.nup || '',
+        nama_barang: found.nama_barang || '',
+        bidang: found.bidang || prev.bidang
+      }));
+    }
+  };
+
+  const handleAddPinjamSubmit = async (e) => {
+    e.preventDefault();
+    if (!addPinjamForm.nama_barang || !addPinjamForm.nama_peminjam || !addPinjamForm.dipinjamkan_oleh) {
+      showToast('Nama barang, nama peminjam, dan dipinjamkan oleh wajib diisi', 'error');
+      return;
+    }
+    setIsSubmittingPinjam(true);
+    try {
+      const formData = new FormData();
+      if (addPinjamForm.barang_id) formData.append('barang_id', addPinjamForm.barang_id);
+      formData.append('no_bmn', addPinjamForm.no_bmn);
+      if (addPinjamForm.nup) formData.append('nup', addPinjamForm.nup);
+      formData.append('nama_barang', addPinjamForm.nama_barang);
+      formData.append('bidang', addPinjamForm.bidang);
+      formData.append('nama_peminjam', addPinjamForm.nama_peminjam);
+      formData.append('kontak_peminjam', addPinjamForm.kontak_peminjam);
+      formData.append('dipinjamkan_oleh', addPinjamForm.dipinjamkan_oleh);
+      formData.append('tgl_pinjam', addPinjamForm.tgl_pinjam);
+      if (addPinjamForm.tgl_kembali_rencana) formData.append('tgl_kembali_rencana', addPinjamForm.tgl_kembali_rencana);
+      formData.append('keperluan', addPinjamForm.keperluan);
+      formData.append('catatan', addPinjamForm.catatan);
+
+      if (addPinjamFile) {
+        formData.append('foto_barang', addPinjamFile);
+      }
+
+      await axios.post('/api/peminjaman', formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+
+      showToast('Peminjaman barang berhasil dicatat', 'success');
+      setIsAddPinjamModalOpen(false);
+      fetchPeminjamanData(peminjamanStatusFilter, peminjamanBidangFilter, peminjamanSearch, 1);
+    } catch (err) {
+      console.error('Error submitting pinjaman:', err);
+      showToast(err.response?.data?.error || 'Gagal menyimpan peminjaman barang', 'error');
+    } finally {
+      setIsSubmittingPinjam(false);
+    }
+  };
+
+  const openReturnModal = (item) => {
+    setSelectedReturnItem(item);
+    setReturnForm({
+      tgl_kembali_aktual: new Date().toISOString().split('T')[0],
+      catatan_pengembalian: ''
+    });
+    setIsReturnModalOpen(true);
+  };
+
+  const handleConfirmReturn = async (e) => {
+    e.preventDefault();
+    if (!selectedReturnItem) return;
+    try {
+      await axios.put(`/api/peminjaman/${selectedReturnItem.id}/kembali`, returnForm, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      showToast(`Barang "${selectedReturnItem.nama_barang}" berhasil ditandai telah dikembalikan`, 'success');
+      setIsReturnModalOpen(false);
+      setSelectedReturnItem(null);
+      fetchPeminjamanData(peminjamanStatusFilter, peminjamanBidangFilter, peminjamanSearch, peminjamanPage);
+    } catch (err) {
+      console.error('Error returning item:', err);
+      showToast(err.response?.data?.error || 'Gagal mengembalikan barang', 'error');
+    }
+  };
+
+  const handleDeletePinjam = async (id) => {
+    if (!window.confirm('Apakah Anda yakin ingin menghapus data peminjaman ini?')) return;
+    try {
+      await axios.delete(`/api/peminjaman/${id}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      showToast('Data peminjaman berhasil dihapus', 'success');
+      fetchPeminjamanData(peminjamanStatusFilter, peminjamanBidangFilter, peminjamanSearch, peminjamanPage);
+    } catch (err) {
+      console.error('Error deleting peminjaman:', err);
+      showToast('Gagal menghapus data peminjaman', 'error');
+    }
+  };
+
   // --- Render Helpers ---
-  const renderNavbar = () => (
-    <nav className="nav-bar">
-      <div className="nav-links">
-        {['dashboard', 'meteorologi', 'klimatologi', 'geofisika', 'tatausaha'].map(p => (
-          <button
-            key={p}
-            className={`nav-link ${currentPage === p ? 'active' : ''}`}
-            onClick={() => {
-              setCurrentPage(p);
-              setSearch('');
-              setPage(1);
-            }}
-          >
-            {p === 'tatausaha' ? 'Tata Usaha' : p.charAt(0).toUpperCase() + p.slice(1)}
-          </button>
-        ))}
-      </div>
-      <div className="nav-right">
-        {user ? (
-          <>
-            <span className="user-info">Halo, <strong>{user.nama}</strong> ({user.bidang})</span>
-            <button className="btn btn-sm btn-outline" onClick={handleLogout}>Logout</button>
-          </>
-        ) : (
-          <button className="btn btn-sm btn-primary" onClick={() => setCurrentPage('login')}>Login</button>
-        )}
-      </div>
-    </nav>
-  );
+  const renderNavbar = () => {
+    const navItems = [
+      { id: 'dashboard', label: 'Dashboard' },
+      { id: 'meteorologi', label: 'Meteorologi' },
+      { id: 'klimatologi', label: 'Klimatologi' },
+      { id: 'geofisika', label: 'Geofisika' },
+      { id: 'tatausaha', label: 'Tata Usaha' },
+      { id: 'peminjaman', label: 'Barang Dipinjam' }
+    ];
+
+    return (
+      <nav className="nav-bar">
+        <div className="nav-links">
+          {navItems.map(p => (
+            <button
+              key={p.id}
+              className={`nav-link ${currentPage === p.id ? 'active' : ''}`}
+              onClick={() => {
+                setCurrentPage(p.id);
+                if (p.id === 'peminjaman') {
+                  setPeminjamanPage(1);
+                } else {
+                  setSearch('');
+                  setPage(1);
+                }
+              }}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+        <div className="nav-right">
+          {user ? (
+            <>
+              <span className="user-info">Halo, <strong>{user.nama}</strong> ({user.bidang})</span>
+              <button className="btn btn-sm btn-outline" onClick={handleLogout}>Logout</button>
+            </>
+          ) : (
+            <button className="btn btn-sm btn-primary" onClick={() => setCurrentPage('login')}>Login</button>
+          )}
+        </div>
+      </nav>
+    );
+  };
 
   const renderDashboard = () => {
     if (!dashboardData) return <div className="loading-state">Memuat data dashboard...</div>;
-    const { total, totalHarga, bidangStats, recentItems, perTahun } = dashboardData;
+    const { total, totalDipinjam, bidangStats, recentItems, perTahun } = dashboardData;
 
     return (
       <div>
@@ -276,9 +518,10 @@ function App() {
             <h3>Total BMN</h3>
             <div className="stat-value">{total}</div>
           </div>
-          <div className="stat-card nilai">
-            <h3>Total Nilai BMN</h3>
-            <div className="stat-value">{formatRupiah(totalHarga)}</div>
+          <div className="stat-card dipinjam" style={{ cursor: 'pointer' }} onClick={() => setCurrentPage('peminjaman')} title="Lihat daftar barang yang dipinjam">
+            <h3>Barang Sedang Dipinjam</h3>
+            <div className="stat-value" style={{ color: '#d97706' }}>{totalDipinjam || 0}</div>
+            <div className="stat-sub">Klik untuk melihat detail &rarr;</div>
           </div>
           {['Meteorologi', 'Klimatologi', 'Geofisika', 'Tata Usaha'].map(b => {
             const cssClass = b.toLowerCase().replace(' ', '');
@@ -286,7 +529,7 @@ function App() {
               <div key={b} className={`stat-card ${cssClass}`}>
                 <h3>{b}</h3>
                 <div className="stat-value">{bidangStats?.[b]?.jumlah || 0}</div>
-                <div className="stat-sub">{formatRupiah(bidangStats?.[b]?.totalHarga || 0)}</div>
+                <div className="stat-sub">Item BMN</div>
               </div>
             );
           })}
@@ -298,10 +541,11 @@ function App() {
             <thead>
               <tr>
                 <th>No BMN</th>
+                <th>NUP</th>
                 <th>Nama Barang</th>
+                <th>Lokasi</th>
                 <th>Bidang</th>
                 <th>Tahun</th>
-                <th>Harga</th>
                 <th>Tanggal Upload</th>
               </tr>
             </thead>
@@ -309,15 +553,16 @@ function App() {
               {recentItems?.map((item, i) => (
                 <tr key={item.id || i}>
                   <td className="nobmn-cell">{item.no_bmn || '-'}</td>
+                  <td className="nup-cell">{item.nup || '-'}</td>
                   <td>{item.nama_barang}</td>
+                  <td><span className="lokasi-badge">{item.lokasi_barang || '-'}</span></td>
                   <td><span className={`bidang-badge ${item.bidang?.toLowerCase().replace(' ', '')}`}>{item.bidang}</span></td>
                   <td>{item.tahun_barang}</td>
-                  <td className="harga-cell">{formatRupiah(item.harga_barang)}</td>
                   <td className="date-cell">{formatDate(item.created_at)}</td>
                 </tr>
               ))}
               {(!recentItems || recentItems.length === 0) && (
-                <tr><td colSpan="6" className="empty-state">Belum ada data BMN</td></tr>
+                <tr><td colSpan="7" className="empty-state">Belum ada data BMN</td></tr>
               )}
             </tbody>
           </table>
@@ -346,7 +591,7 @@ function App() {
 
   const renderBidangPage = (bidangName) => {
     const showAksi = user && user.role === 'admin';
-    const colSpan = showAksi ? 9 : 8;
+    const colSpan = showAksi ? 10 : 9;
 
     return (
       <div>
@@ -362,7 +607,7 @@ function App() {
             <form onSubmit={handleSearchSubmit} style={{display:'flex', gap:'0.5rem'}}>
               <input
                 type="text"
-                placeholder="Cari nama atau No BMN..."
+                placeholder="Cari nama, No BMN, NUP, atau lokasi..."
                 value={search}
                 onChange={e => setSearch(e.target.value)}
               />
@@ -378,9 +623,10 @@ function App() {
                 <th>No</th>
                 <th>Foto</th>
                 <th>No BMN</th>
+                <th>NUP</th>
                 <th>Nama Barang</th>
+                <th>Lokasi Barang</th>
                 <th>Tahun</th>
-                <th>Harga</th>
                 <th>Keterangan</th>
                 <th>Tanggal Upload</th>
                 {showAksi && <th>Aksi</th>}
@@ -404,9 +650,10 @@ function App() {
                       ) : <div className="no-image">No Image</div>}
                     </td>
                     <td className="nobmn-cell">{item.no_bmn || '-'}</td>
+                    <td className="nup-cell">{item.nup || '-'}</td>
                     <td>{item.nama_barang}</td>
+                    <td><span className="lokasi-badge">{item.lokasi_barang || '-'}</span></td>
                     <td>{item.tahun_barang}</td>
-                    <td className="harga-cell">{formatRupiah(item.harga_barang)}</td>
                     <td>{item.keterangan || '-'}</td>
                     <td className="date-cell">{formatDate(item.created_at)}</td>
                     {showAksi && (
@@ -432,11 +679,257 @@ function App() {
     );
   };
 
+  const renderPeminjamanPage = () => {
+    const showAksi = !!user;
+
+    return (
+      <div>
+        <h2 className="dashboard-title">Data Barang yang Dipinjam - PSIMKG</h2>
+
+        {/* Stats Grid Peminjaman */}
+        <div className="stats-grid">
+          <div className="stat-card total">
+            <h3>Total Catatan Pinjaman</h3>
+            <div className="stat-value">{peminjamanStats.totalSemua}</div>
+          </div>
+          <div className="stat-card dipinjam">
+            <h3>Sedang Dipinjam</h3>
+            <div className="stat-value" style={{ color: '#d97706' }}>{peminjamanStats.totalDipinjam}</div>
+            <div className="stat-sub">Barang belum dikembalikan</div>
+          </div>
+          <div className="stat-card dikembalikan">
+            <h3>Sudah Dikembalikan</h3>
+            <div className="stat-value" style={{ color: '#28a745' }}>{peminjamanStats.totalDikembalikan}</div>
+            <div className="stat-sub">Barang telah kembali</div>
+          </div>
+        </div>
+
+        {/* Controls Bar */}
+        <div className="controls-bar">
+          <div className="controls-left">
+            {user ? (
+              <button className="btn btn-primary" onClick={openAddPinjamModal}>
+                + Catat Peminjaman
+              </button>
+            ) : (
+              <button className="btn btn-primary" onClick={() => setCurrentPage('login')}>
+                Login untuk Catat Pinjaman
+              </button>
+            )}
+
+            {/* Filter Tabs Status */}
+            <div className="filter-tabs">
+              <button
+                className={`filter-tab ${peminjamanStatusFilter === 'Semua' ? 'active' : ''}`}
+                onClick={() => { setPeminjamanStatusFilter('Semua'); setPeminjamanPage(1); }}
+              >
+                Semua <span className="filter-count">{peminjamanStats.totalSemua}</span>
+              </button>
+              <button
+                className={`filter-tab ${peminjamanStatusFilter === 'Dipinjam' ? 'active' : ''}`}
+                onClick={() => { setPeminjamanStatusFilter('Dipinjam'); setPeminjamanPage(1); }}
+              >
+                Sedang Dipinjam <span className="filter-count">{peminjamanStats.totalDipinjam}</span>
+              </button>
+              <button
+                className={`filter-tab ${peminjamanStatusFilter === 'Dikembalikan' ? 'active' : ''}`}
+                onClick={() => { setPeminjamanStatusFilter('Dikembalikan'); setPeminjamanPage(1); }}
+              >
+                Sudah Kembali <span className="filter-count">{peminjamanStats.totalDikembalikan}</span>
+              </button>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            {/* Filter Bidang */}
+            <select
+              value={peminjamanBidangFilter}
+              onChange={(e) => { setPeminjamanBidangFilter(e.target.value); setPeminjamanPage(1); }}
+              style={{
+                padding: '0.6rem 0.8rem',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius)',
+                fontFamily: 'inherit',
+                fontSize: '0.9rem',
+                backgroundColor: '#fff'
+              }}
+            >
+              <option value="Semua">Semua Bidang</option>
+              <option value="Meteorologi">Meteorologi</option>
+              <option value="Klimatologi">Klimatologi</option>
+              <option value="Geofisika">Geofisika</option>
+              <option value="Tata Usaha">Tata Usaha</option>
+            </select>
+
+            {/* Search Box */}
+            <form onSubmit={handlePeminjamanSearchSubmit} style={{ display: 'flex', gap: '0.5rem' }}>
+              <input
+                type="text"
+                placeholder="Cari barang, peminjam, atau petugas..."
+                value={peminjamanSearch}
+                onChange={e => setPeminjamanSearch(e.target.value)}
+                style={{
+                  padding: '0.6rem 1rem',
+                  border: '1px solid var(--border)',
+                  borderRadius: 'var(--radius)',
+                  width: '260px',
+                  fontSize: '0.9rem'
+                }}
+              />
+              <button type="submit" className="btn btn-sm btn-primary">Cari</button>
+            </form>
+          </div>
+        </div>
+
+        {/* Peminjaman Table */}
+        <div className="table-container">
+          <table className="bmn-table">
+            <thead>
+              <tr>
+                <th>No</th>
+                <th>Foto</th>
+                <th>No BMN / NUP</th>
+                <th>Nama Barang</th>
+                <th>Bidang</th>
+                <th>Peminjam</th>
+                <th>Dipinjamkan Oleh</th>
+                <th>Tgl Pinjam / Kembali</th>
+                <th>Status</th>
+                <th>Keperluan / Catatan</th>
+                {showAksi && <th>Aksi</th>}
+              </tr>
+            </thead>
+            <tbody>
+              {peminjamanData.length === 0 ? (
+                <tr><td colSpan={showAksi ? 11 : 10} className="empty-state">Belum ada data barang yang dipinjam</td></tr>
+              ) : (
+                peminjamanData.map((item, index) => {
+                  const isDipinjam = item.status === 'Dipinjam';
+                  return (
+                    <tr key={item.id}>
+                      <td>{(peminjamanPage - 1) * 10 + index + 1}</td>
+                      <td>
+                        {item.foto_barang ? (
+                          <img
+                            src={`/uploads/${item.foto_barang}`}
+                            alt="Thumbnail"
+                            className="thumbnail"
+                            onClick={() => setLightboxImage(`/uploads/${item.foto_barang}`)}
+                          />
+                        ) : <div className="no-image">No Image</div>}
+                      </td>
+                      <td className="nobmn-cell">
+                        <div>{item.no_bmn || '-'}</div>
+                        {item.nup && <div style={{ fontSize: '0.78rem', color: '#0d9488' }}>NUP: {item.nup}</div>}
+                      </td>
+                      <td><strong>{item.nama_barang}</strong></td>
+                      <td>
+                        <span className={`bidang-badge ${item.bidang?.toLowerCase().replace(' ', '')}`}>
+                          {item.bidang}
+                        </span>
+                      </td>
+                      <td>
+                        <div className="peminjam-cell">
+                          <span className="peminjam-nama">{item.nama_peminjam}</span>
+                          {item.kontak_peminjam && (
+                            <span className="peminjam-kontak">📞 {item.kontak_peminjam}</span>
+                          )}
+                        </div>
+                      </td>
+                      <td>
+                        {/* FITUR UTAMA: DIPINJAMKAN OLEH SIAPA */}
+                        <div className="petugas-pemberi" title="Petugas yang meminjamkan barang ini">
+                          <span className="petugas-icon">👤</span>
+                          <span>{item.dipinjamkan_oleh}</span>
+                        </div>
+                      </td>
+                      <td className="date-cell">
+                        <div><strong>Pinjam:</strong> {formatDate(item.tgl_pinjam)}</div>
+                        {isDipinjam ? (
+                          item.tgl_kembali_rencana && (
+                            <div style={{ color: '#d97706', fontSize: '0.8rem' }}>
+                              <strong>Rencana:</strong> {formatDate(item.tgl_kembali_rencana)}
+                            </div>
+                          )
+                        ) : (
+                          <div style={{ color: '#28a745', fontSize: '0.8rem' }}>
+                            <strong>Kembali:</strong> {formatDate(item.tgl_kembali_aktual)}
+                          </div>
+                        )}
+                      </td>
+                      <td>
+                        <span className={`status-badge ${isDipinjam ? 'dipinjam' : 'dikembalikan'}`}>
+                          <span className="status-dot"></span>
+                          {isDipinjam ? 'Dipinjam' : 'Dikembalikan'}
+                        </span>
+                      </td>
+                      <td>
+                        <div style={{ maxWidth: '220px', fontSize: '0.85rem' }}>
+                          {item.keperluan && <div><em>{item.keperluan}</em></div>}
+                          {item.catatan && <div style={{ color: 'var(--text-light)', marginTop: '0.2rem' }}>{item.catatan}</div>}
+                          {!item.keperluan && !item.catatan && '-'}
+                        </div>
+                      </td>
+                      {showAksi && (
+                        <td>
+                          <div style={{ display: 'flex', gap: '0.4rem', flexDirection: 'column' }}>
+                            {isDipinjam && (
+                              <button
+                                className="btn btn-sm btn-primary"
+                                style={{ backgroundColor: '#28a745', borderColor: '#28a745' }}
+                                onClick={() => openReturnModal(item)}
+                              >
+                                ✓ Kembalikan
+                              </button>
+                            )}
+                            {user?.role === 'admin' && (
+                              <button
+                                className="btn btn-sm btn-danger"
+                                onClick={() => handleDeletePinjam(item.id)}
+                              >
+                                Hapus
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination */}
+        {peminjamanTotalPages > 1 && (
+          <div className="pagination">
+            <button
+              className="btn-page"
+              disabled={peminjamanPage === 1}
+              onClick={() => setPeminjamanPage(p => p - 1)}
+            >
+              Sebelumnya
+            </button>
+            <span className="page-info">Halaman {peminjamanPage} dari {peminjamanTotalPages}</span>
+            <button
+              className="btn-page"
+              disabled={peminjamanPage >= peminjamanTotalPages}
+              onClick={() => setPeminjamanPage(p => p + 1)}
+            >
+              Selanjutnya
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const renderLoginPage = () => (
     <div className="login-container">
       <div className="login-card">
         <h2>Login Sistem BMN</h2>
-        <p className="login-subtitle">Masuk untuk mengelola data BMN</p>
+        <p className="login-subtitle">Masuk untuk mengelola data BMN & peminjaman</p>
         {loginError && <div className="login-error">{loginError}</div>}
         <form onSubmit={handleLogin}>
           <div className="form-group">
@@ -483,15 +976,43 @@ function App() {
             <button type="button" className="close-btn" onClick={() => setIsAddModalOpen(false)}>&times;</button>
           </div>
           <form onSubmit={handleAddSubmit} className="bmn-form">
-            <div className="form-group">
-              <label>No BMN</label>
-              <input 
-                type="text" 
-                placeholder="Contoh: BMN-2024-001"
-                value={addForm.no_bmn} 
-                onChange={e => setAddForm({...addForm, no_bmn: e.target.value})} 
-              />
+            <div className="form-row">
+              <div className="form-group">
+                <label>No BMN *</label>
+                <input 
+                  type="text" 
+                  required
+                  placeholder="Contoh: BMN-2024-001"
+                  value={addForm.no_bmn} 
+                  onChange={e => setAddForm({...addForm, no_bmn: e.target.value})} 
+                />
+              </div>
+              <div className="form-group">
+                <label>NUP (Nomor Urut Pendaftaran) *</label>
+                <input 
+                  type="text" 
+                  required
+                  placeholder="Contoh: 1, 0001, atau nomor urut"
+                  value={addForm.nup} 
+                  onChange={e => setAddForm({...addForm, nup: e.target.value})} 
+                />
+              </div>
             </div>
+
+            <div className="form-group">
+              <label>Lokasi Barang *</label>
+              <select
+                required
+                value={addForm.lokasi_barang}
+                onChange={e => setAddForm({...addForm, lokasi_barang: e.target.value})}
+              >
+                <option value="">-- Pilih Lokasi Barang --</option>
+                {LOKASI_OPTIONS.map(loc => (
+                  <option key={loc} value={loc}>{loc}</option>
+                ))}
+              </select>
+            </div>
+
             <div className="form-group">
               <label>Nama Barang *</label>
               <input 
@@ -502,47 +1023,39 @@ function App() {
                 onChange={e => setAddForm({...addForm, nama_barang: e.target.value})} 
               />
             </div>
+
             <div className="form-row">
               <div className="form-group">
                 <label>Tahun Barang *</label>
                 <input 
                   type="number" 
                   required 
-                  placeholder="2024"
+                  placeholder="Contoh: 2024"
                   value={addForm.tahun_barang} 
                   onChange={e => setAddForm({...addForm, tahun_barang: e.target.value})} 
                 />
               </div>
-              <div className="form-group">
-                <label>Harga Barang (Rp)</label>
-                <input 
-                  type="number" 
-                  placeholder="0"
-                  value={addForm.harga_barang} 
-                  onChange={e => setAddForm({...addForm, harga_barang: e.target.value})} 
-                />
-              </div>
-            </div>
 
-            {user?.role === 'admin' ? (
-              <div className="form-group">
-                <label>Bidang</label>
-                <select 
-                  value={addForm.bidang || getBidangName(currentPage) || 'Meteorologi'} 
-                  onChange={e => setAddForm({...addForm, bidang: e.target.value})}
-                >
-                  <option value="Meteorologi">Meteorologi</option>
-                  <option value="Klimatologi">Klimatologi</option>
-                  <option value="Geofisika">Geofisika</option>
-                  <option value="Tata Usaha">Tata Usaha</option>
-                </select>
-              </div>
-            ) : (
-              <div className="form-group">
-                <label>Bidang</label>
-                <div className="readonly-field">{user?.bidang || getBidangName(currentPage) || 'Meteorologi'}</div>
-              </div>
-            )}
+              {user?.role === 'admin' ? (
+                <div className="form-group">
+                  <label>Bidang</label>
+                  <select 
+                    value={addForm.bidang || getBidangName(currentPage) || 'Meteorologi'} 
+                    onChange={e => setAddForm({...addForm, bidang: e.target.value})}
+                  >
+                    <option value="Meteorologi">Meteorologi</option>
+                    <option value="Klimatologi">Klimatologi</option>
+                    <option value="Geofisika">Geofisika</option>
+                    <option value="Tata Usaha">Tata Usaha</option>
+                  </select>
+                </div>
+              ) : (
+                <div className="form-group">
+                  <label>Bidang</label>
+                  <div className="readonly-field">{user?.bidang || getBidangName(currentPage) || 'Meteorologi'}</div>
+                </div>
+              )}
+            </div>
 
             <div className="form-group">
               <label>Foto Barang</label>
@@ -563,7 +1076,7 @@ function App() {
               <label>Keterangan</label>
               <textarea 
                 rows="3"
-                placeholder="Kondisi barang, lokasi, atau catatan lainnya..."
+                placeholder="Kondisi barang, catatan tambahan..."
                 value={addForm.keterangan} 
                 onChange={e => setAddForm({...addForm, keterangan: e.target.value})}
               ></textarea>
@@ -573,6 +1086,262 @@ function App() {
               <button type="button" className="btn btn-secondary" onClick={() => setIsAddModalOpen(false)}>Batal</button>
               <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
                 {isSubmitting ? 'Menyimpan...' : 'Simpan Data'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  };
+
+  // Modal: Catat Peminjaman Barang Baru
+  const renderAddPinjamModal = () => {
+    if (!isAddPinjamModalOpen) return null;
+
+    return (
+      <div className="modal-overlay" onClick={() => setIsAddPinjamModalOpen(false)}>
+        <div className="modal-content" onClick={e => e.stopPropagation()}>
+          <div className="modal-header">
+            <h2>Catat Peminjaman Barang</h2>
+            <button type="button" className="close-btn" onClick={() => setIsAddPinjamModalOpen(false)}>&times;</button>
+          </div>
+          <form onSubmit={handleAddPinjamSubmit} className="bmn-form">
+            
+            {/* Pilihan Sumber Barang */}
+            <div className="form-group">
+              <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>Barang BMN</span>
+                <span style={{ fontSize: '0.8rem', fontWeight: 'normal', color: 'var(--secondary)' }}>
+                  <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={!addPinjamForm.pilihDariBmn}
+                      onChange={e => setAddPinjamForm({...addPinjamForm, pilihDariBmn: !e.target.checked, barang_id: ''})}
+                    />
+                    Input Manual (di luar data BMN)
+                  </label>
+                </span>
+              </label>
+
+              {addPinjamForm.pilihDariBmn ? (
+                <select
+                  value={addPinjamForm.barang_id}
+                  onChange={e => handleSelectBmnItem(e.target.value)}
+                  style={{ width: '100%' }}
+                >
+                  <option value="">-- Pilih Barang dari Database BMN --</option>
+                  {bmnOptions.map(b => (
+                    <option key={b.id} value={b.id}>
+                      {b.nama_barang} ({b.no_bmn || 'No BMN -'}{b.nup ? ` / NUP: ${b.nup}` : ''}) [{b.bidang}]
+                    </option>
+                  ))}
+                </select>
+              ) : null}
+            </div>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label>No BMN</label>
+                <input
+                  type="text"
+                  placeholder="Contoh: BMN-2024-001"
+                  value={addPinjamForm.no_bmn}
+                  onChange={e => setAddPinjamForm({...addPinjamForm, no_bmn: e.target.value})}
+                />
+              </div>
+              <div className="form-group">
+                <label>NUP</label>
+                <input
+                  type="text"
+                  placeholder="Nomor Urut Pendaftaran"
+                  value={addPinjamForm.nup}
+                  onChange={e => setAddPinjamForm({...addPinjamForm, nup: e.target.value})}
+                />
+              </div>
+              <div className="form-group">
+                <label>Bidang</label>
+                <select
+                  value={addPinjamForm.bidang}
+                  onChange={e => setAddPinjamForm({...addPinjamForm, bidang: e.target.value})}
+                >
+                  <option value="Meteorologi">Meteorologi</option>
+                  <option value="Klimatologi">Klimatologi</option>
+                  <option value="Geofisika">Geofisika</option>
+                  <option value="Tata Usaha">Tata Usaha</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label>Nama Barang *</label>
+              <input
+                type="text"
+                required
+                placeholder="Nama peralatan / instrumen yang dipinjam"
+                value={addPinjamForm.nama_barang}
+                onChange={e => setAddPinjamForm({...addPinjamForm, nama_barang: e.target.value})}
+              />
+            </div>
+
+            {/* FITUR UTAMA: DIPINJAMKAN OLEH SIAPA */}
+            <div className="form-group" style={{ background: '#f0f7ff', padding: '0.85rem', borderRadius: 'var(--radius)', border: '1px solid #b8daff' }}>
+              <label style={{ color: '#004d99', fontWeight: '700' }}>
+                👤 Dipinjamkan Oleh Siapa? *
+              </label>
+              <input
+                type="text"
+                required
+                placeholder="Nama petugas/staf yang meminjamkan barang..."
+                value={addPinjamForm.dipinjamkan_oleh}
+                onChange={e => setAddPinjamForm({...addPinjamForm, dipinjamkan_oleh: e.target.value})}
+                style={{ backgroundColor: '#fff', fontWeight: '600' }}
+              />
+              <small style={{ color: '#004d99', display: 'block', marginTop: '0.3rem', fontSize: '0.8rem' }}>
+                Isikan nama petugas / pihak yang menyerahkan/meminjamkan barang ini.
+              </small>
+            </div>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label>Nama Peminjam *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Nama orang / seksi / instansi peminjam"
+                  value={addPinjamForm.nama_peminjam}
+                  onChange={e => setAddPinjamForm({...addPinjamForm, nama_peminjam: e.target.value})}
+                />
+              </div>
+              <div className="form-group">
+                <label>Kontak / No HP Peminjam</label>
+                <input
+                  type="text"
+                  placeholder="08xxxxxxxxxx"
+                  value={addPinjamForm.kontak_peminjam}
+                  onChange={e => setAddPinjamForm({...addPinjamForm, kontak_peminjam: e.target.value})}
+                />
+              </div>
+            </div>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label>Tanggal Pinjam *</label>
+                <input
+                  type="date"
+                  required
+                  value={addPinjamForm.tgl_pinjam}
+                  onChange={e => setAddPinjamForm({...addPinjamForm, tgl_pinjam: e.target.value})}
+                />
+              </div>
+              <div className="form-group">
+                <label>Rencana Pengembalian</label>
+                <input
+                  type="date"
+                  value={addPinjamForm.tgl_kembali_rencana}
+                  onChange={e => setAddPinjamForm({...addPinjamForm, tgl_kembali_rencana: e.target.value})}
+                />
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label>Keperluan Peminjaman</label>
+              <input
+                type="text"
+                placeholder="Contoh: Kalibrasi alat, penelitian, pameran, survei lapangan"
+                value={addPinjamForm.keperluan}
+                onChange={e => setAddPinjamForm({...addPinjamForm, keperluan: e.target.value})}
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Catatan / Kondisi Saat Dipinjam</label>
+              <textarea
+                rows="2"
+                placeholder="Catatan kelengkapan alat, kabel, tas, adaptor, kondisi fisik..."
+                value={addPinjamForm.catatan}
+                onChange={e => setAddPinjamForm({...addPinjamForm, catatan: e.target.value})}
+              ></textarea>
+            </div>
+
+            <div className="form-group">
+              <label>Foto Barang / Bukti Peminjaman (Opsional)</label>
+              <input type="file" accept="image/*" onChange={e => {
+                if (e.target.files[0]) {
+                  setAddPinjamFile(e.target.files[0]);
+                  setAddPinjamPreview(URL.createObjectURL(e.target.files[0]));
+                }
+              }} />
+              {addPinjamPreview && (
+                <div className="image-preview-container">
+                  <img src={addPinjamPreview} alt="Preview" className="image-preview" />
+                </div>
+              )}
+            </div>
+
+            <div className="form-actions">
+              <button type="button" className="btn btn-secondary" onClick={() => setIsAddPinjamModalOpen(false)}>
+                Batal
+              </button>
+              <button type="submit" className="btn btn-primary" disabled={isSubmittingPinjam}>
+                {isSubmittingPinjam ? 'Menyimpan...' : 'Simpan Peminjaman'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  };
+
+  // Modal: Kembalikan Barang
+  const renderReturnModal = () => {
+    if (!isReturnModalOpen || !selectedReturnItem) return null;
+
+    return (
+      <div className="modal-overlay" onClick={() => setIsReturnModalOpen(false)}>
+        <div className="modal-content" onClick={e => e.stopPropagation()}>
+          <div className="modal-header">
+            <h2>Konfirmasi Pengembalian Barang</h2>
+            <button type="button" className="close-btn" onClick={() => setIsReturnModalOpen(false)}>&times;</button>
+          </div>
+          <form onSubmit={handleConfirmReturn} className="bmn-form">
+            <div style={{ background: '#f8f9fa', padding: '1rem', borderRadius: 'var(--radius)', marginBottom: '1.2rem', border: '1px solid var(--border)' }}>
+              <div style={{ fontSize: '1.05rem', fontWeight: '700', color: 'var(--primary)', marginBottom: '0.3rem' }}>
+                {selectedReturnItem.nama_barang}
+              </div>
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-light)', lineHeight: '1.6' }}>
+                <div><strong>No BMN:</strong> {selectedReturnItem.no_bmn || '-'} {selectedReturnItem.nup ? `(NUP: ${selectedReturnItem.nup})` : ''}</div>
+                <div><strong>Peminjam:</strong> {selectedReturnItem.nama_peminjam}</div>
+                <div><strong>Dipinjamkan Oleh:</strong> {selectedReturnItem.dipinjamkan_oleh}</div>
+                <div><strong>Tanggal Pinjam:</strong> {formatDate(selectedReturnItem.tgl_pinjam)}</div>
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label>Tanggal Dikembalikan *</label>
+              <input
+                type="date"
+                required
+                value={returnForm.tgl_kembali_aktual}
+                onChange={e => setReturnForm({...returnForm, tgl_kembali_aktual: e.target.value})}
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Catatan Pengembalian / Kondisi Barang</label>
+              <textarea
+                rows="3"
+                placeholder="Contoh: Barang telah kembali lengkap dalam kondisi baik dan berfungsi normal..."
+                value={returnForm.catatan_pengembalian}
+                onChange={e => setReturnForm({...returnForm, catatan_pengembalian: e.target.value})}
+              ></textarea>
+            </div>
+
+            <div className="form-actions">
+              <button type="button" className="btn btn-secondary" onClick={() => setIsReturnModalOpen(false)}>
+                Batal
+              </button>
+              <button type="submit" className="btn btn-primary" style={{ backgroundColor: '#28a745', borderColor: '#28a745' }}>
+                Konfirmasi Telah Kembali
               </button>
             </div>
           </form>
@@ -595,10 +1364,15 @@ function App() {
 
   return (
     <div className="app-container">
+      {/* ===== HEADER: LOGO BMKG & ENLARGED PSIMKG ON TOP OF SISTEM INFORMASI BMN ===== */}
       <header className="app-header">
-        <div className="header-content">
-          <h1>Sistem Informasi Barang Milik Negara (BMN)</h1>
-          <p>PSIMKG - Pusat Standardisasi Instrumen MKG</p>
+        <div className="header-container">
+          <img src="/logo-bmkg.png" alt="Logo BMKG" className="header-logo" />
+          <div className="header-text-block">
+            <h1 className="header-instansi-title">PSIMKG - PUSAT STANDARDISASI INSTRUMEN MKG</h1>
+            <p className="header-instansi-sub">Badan Meteorologi, Klimatologi, dan Geofisika</p>
+            <h2 className="header-app-title">Sistem Informasi Barang Milik Negara (BMN)</h2>
+          </div>
         </div>
       </header>
 
@@ -607,6 +1381,7 @@ function App() {
       <main className="app-main">
         {currentPage === 'dashboard' && renderDashboard()}
         {currentPage === 'login' && renderLoginPage()}
+        {currentPage === 'peminjaman' && renderPeminjamanPage()}
         {['meteorologi', 'klimatologi', 'geofisika', 'tatausaha'].includes(currentPage) && renderBidangPage(getBidangName(currentPage))}
       </main>
 
@@ -615,6 +1390,8 @@ function App() {
       </footer>
 
       {renderAddModal()}
+      {renderAddPinjamModal()}
+      {renderReturnModal()}
       {renderLightbox()}
 
       <div className="toast-container">

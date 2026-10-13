@@ -5,6 +5,7 @@ const fs = require('fs');
 const { getDb } = require('./database');
 const barangRoutes = require('./routes/barang');
 const authRoutes = require('./routes/auth');
+const peminjamanRoutes = require('./routes/peminjaman');
 
 const app = express();
 const PORT = 8022;
@@ -17,16 +18,17 @@ if (!fs.existsSync(uploadsDir)) {
 
 // Middleware
 app.use(cors({
-  origin: ['http://localhost:3022', 'http://127.0.0.1:3022', 'http://localhost', 'http://127.0.0.1'],
-  optionsSuccessStatus: 200
+  origin: true,
+  credentials: true
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use(['/uploads', '/bmn/uploads'], express.static(path.join(__dirname, 'uploads')));
 
-// Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/barang', barangRoutes);
+// Routes (supports both direct /api and /bmn/api paths)
+app.use(['/api/auth', '/bmn/api/auth'], authRoutes);
+app.use(['/api/barang', '/bmn/api/barang'], barangRoutes);
+app.use(['/api/peminjaman', '/bmn/api/peminjaman'], peminjamanRoutes);
 
 // Error handling
 app.use((err, req, res, next) => {

@@ -52,8 +52,9 @@ router.get('/stats/summary', async (req, res) => {
     const totalResult = db.exec('SELECT COUNT(*) as total FROM barang');
     const total = totalResult.length > 0 ? totalResult[0].values[0][0] : 0;
 
-    const totalHargaResult = db.exec('SELECT COALESCE(SUM(harga_barang), 0) as total_harga FROM barang');
-    const totalHarga = totalHargaResult.length > 0 ? totalHargaResult[0].values[0][0] : 0;
+    // Total barang sedang dipinjam
+    const dipinjamResult = db.exec("SELECT COUNT(*) as total FROM peminjaman WHERE status = 'Dipinjam'");
+    const totalDipinjam = dipinjamResult.length > 0 ? dipinjamResult[0].values[0][0] : 0;
 
     // Per bidang stats
     const bidangStats = {};
@@ -61,11 +62,9 @@ router.get('/stats/summary', async (req, res) => {
 
     for (const bidang of bidangList) {
       const countResult = db.exec('SELECT COUNT(*) as jumlah FROM barang WHERE bidang = ?', [bidang]);
-      const hargaResult = db.exec('SELECT COALESCE(SUM(harga_barang), 0) as total FROM barang WHERE bidang = ?', [bidang]);
 
       bidangStats[bidang] = {
-        jumlah: countResult.length > 0 ? countResult[0].values[0][0] : 0,
-        totalHarga: hargaResult.length > 0 ? hargaResult[0].values[0][0] : 0
+        jumlah: countResult.length > 0 ? countResult[0].values[0][0] : 0
       };
     }
 
@@ -81,7 +80,7 @@ router.get('/stats/summary', async (req, res) => {
       success: true,
       data: {
         total,
-        totalHarga,
+        totalDipinjam,
         bidangStats,
         recentItems,
         perTahun
@@ -106,15 +105,15 @@ router.get('/', async (req, res) => {
     let countQuery, dataQuery, params, countParams;
 
     if (bidang) {
-      countQuery = 'SELECT COUNT(*) as total FROM barang WHERE bidang = ? AND (nama_barang LIKE ? OR no_bmn LIKE ?)';
-      countParams = [bidang, searchTerm, searchTerm];
-      dataQuery = 'SELECT * FROM barang WHERE bidang = ? AND (nama_barang LIKE ? OR no_bmn LIKE ?) ORDER BY id DESC LIMIT ? OFFSET ?';
-      params = [bidang, searchTerm, searchTerm, limit, offset];
+      countQuery = 'SELECT COUNT(*) as total FROM barang WHERE bidang = ? AND (nama_barang LIKE ? OR no_bmn LIKE ? OR nup LIKE ? OR lokasi_barang LIKE ?)';
+      countParams = [bidang, searchTerm, searchTerm, searchTerm, searchTerm];
+      dataQuery = 'SELECT * FROM barang WHERE bidang = ? AND (nama_barang LIKE ? OR no_bmn LIKE ? OR nup LIKE ? OR lokasi_barang LIKE ?) ORDER BY id DESC LIMIT ? OFFSET ?';
+      params = [bidang, searchTerm, searchTerm, searchTerm, searchTerm, limit, offset];
     } else {
-      countQuery = 'SELECT COUNT(*) as total FROM barang WHERE nama_barang LIKE ? OR no_bmn LIKE ?';
-      countParams = [searchTerm, searchTerm];
-      dataQuery = 'SELECT * FROM barang WHERE (nama_barang LIKE ? OR no_bmn LIKE ?) ORDER BY id DESC LIMIT ? OFFSET ?';
-      params = [searchTerm, searchTerm, limit, offset];
+      countQuery = 'SELECT COUNT(*) as total FROM barang WHERE (nama_barang LIKE ? OR no_bmn LIKE ? OR nup LIKE ? OR lokasi_barang LIKE ?)';
+      countParams = [searchTerm, searchTerm, searchTerm, searchTerm];
+      dataQuery = 'SELECT * FROM barang WHERE (nama_barang LIKE ? OR no_bmn LIKE ? OR nup LIKE ? OR lokasi_barang LIKE ?) ORDER BY id DESC LIMIT ? OFFSET ?';
+      params = [searchTerm, searchTerm, searchTerm, searchTerm, limit, offset];
     }
 
     const countResult = db.exec(countQuery, countParams);
@@ -157,7 +156,7 @@ router.get('/:id', async (req, res) => {
 router.post('/', authenticateToken, upload.single('foto_barang'), async (req, res) => {
   try {
     const db = await getDb();
-    const { no_bmn, nama_barang, tahun_barang, harga_barang, keterangan } = req.body;
+    const { no_bmn, nup, nama_barang, tahun_barang, lokasi_barang, keterangan } = req.body;
     const foto_barang = req.file ? req.file.filename : null;
 
     // User can only add to their own bidang, admin can specify any
@@ -166,22 +165,54 @@ router.post('/', authenticateToken, upload.single('foto_barang'), async (req, re
       bidang = req.body.bidang;
     }
 
-    if (!nama_barang || !tahun_barang) {
-      return res.status(400).json({ success: false, error: 'Nama barang dan tahun barang harus diisi.' });
+    // Validasi No BMN, NUP, dan Lokasi Barang wajib diisi
+    if (!no_bmn || !no_bmn.trim()) {
+      return res.status(400).json({ success: false, error: 'No BMN wajib diisi.' });
+    }
+    if (!nup || !nup.trim()) {
+      return res.status(400).json({ success: false, error: 'NUP wajib diisi.' });
+    }
+    if (!lokasi_barang || !lokasi_barang.trim()) {
+      return res.status(400).json({ success: false, error: 'Lokasi barang wajib dipilih.' });
+    }
+    if (!nama_barang || !nama_barang.trim()) {
+      return res.status(400).json({ success: false, error: 'Nama barang wajib diisi.' });
+    }
+    if (!tahun_barang) {
+      return res.status(400).json({ success: false, error: 'Tahun barang wajib diisi.' });
     }
 
     db.run(
-      'INSERT INTO barang (no_bmn, nama_barang, bidang, tahun_barang, harga_barang, foto_barang, keterangan) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [no_bmn || null, nama_barang, bidang, parseInt(tahun_barang), parseFloat(harga_barang) || 0, foto_barang, keterangan || null]
+      'INSERT INTO barang (no_bmn, nup, nama_barang, bidang, tahun_barang, lokasi_barang, foto_barang, keterangan) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [
+        no_bmn.trim(),
+        nup.trim(),
+        nama_barang.trim(),
+        bidang,
+        parseInt(tahun_barang),
+        lokasi_barang.trim(),
+        foto_barang,
+        keterangan ? keterangan.trim() : null
+      ]
     );
-    saveDb();
 
     const lastId = db.exec('SELECT last_insert_rowid() as id');
     const id = lastId[0].values[0][0];
+    saveDb();
 
     res.status(201).json({
       success: true,
-      data: { id, no_bmn, nama_barang, bidang, tahun_barang: parseInt(tahun_barang), harga_barang: parseFloat(harga_barang) || 0, foto_barang, keterangan },
+      data: {
+        id,
+        no_bmn: no_bmn.trim(),
+        nup: nup.trim(),
+        nama_barang: nama_barang.trim(),
+        bidang,
+        tahun_barang: parseInt(tahun_barang),
+        lokasi_barang: lokasi_barang.trim(),
+        foto_barang,
+        keterangan: keterangan ? keterangan.trim() : null
+      },
       message: 'Data BMN berhasil ditambahkan'
     });
   } catch (error) {
@@ -194,7 +225,7 @@ router.put('/:id', authenticateToken, upload.single('foto_barang'), async (req, 
   try {
     const db = await getDb();
     const id = req.params.id;
-    const { no_bmn, nama_barang, tahun_barang, harga_barang, keterangan } = req.body;
+    const { no_bmn, nup, nama_barang, tahun_barang, lokasi_barang, keterangan } = req.body;
     const newFoto = req.file ? req.file.filename : null;
 
     const existing = resultToArray(db.exec('SELECT * FROM barang WHERE id = ?', [id]));
@@ -209,6 +240,20 @@ router.put('/:id', authenticateToken, upload.single('foto_barang'), async (req, 
       return res.status(403).json({ success: false, error: 'Anda tidak memiliki akses untuk mengedit data bidang lain.' });
     }
 
+    // Validasi jika diisi
+    if (no_bmn !== undefined && !no_bmn.trim()) {
+      return res.status(400).json({ success: false, error: 'No BMN wajib diisi.' });
+    }
+    if (nup !== undefined && !nup.trim()) {
+      return res.status(400).json({ success: false, error: 'NUP wajib diisi.' });
+    }
+    if (lokasi_barang !== undefined && !lokasi_barang.trim()) {
+      return res.status(400).json({ success: false, error: 'Lokasi barang wajib dipilih.' });
+    }
+    if (nama_barang !== undefined && !nama_barang.trim()) {
+      return res.status(400).json({ success: false, error: 'Nama barang wajib diisi.' });
+    }
+
     let foto_barang = item.foto_barang;
     if (newFoto) {
       if (item.foto_barang) {
@@ -219,14 +264,15 @@ router.put('/:id', authenticateToken, upload.single('foto_barang'), async (req, 
     }
 
     db.run(
-      'UPDATE barang SET no_bmn = ?, nama_barang = ?, tahun_barang = ?, harga_barang = ?, foto_barang = ?, keterangan = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      'UPDATE barang SET no_bmn = ?, nup = ?, nama_barang = ?, tahun_barang = ?, lokasi_barang = ?, foto_barang = ?, keterangan = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
       [
-        no_bmn !== undefined ? no_bmn : item.no_bmn,
-        nama_barang || item.nama_barang,
+        no_bmn !== undefined ? no_bmn.trim() : item.no_bmn,
+        nup !== undefined ? nup.trim() : item.nup,
+        nama_barang !== undefined ? nama_barang.trim() : item.nama_barang,
         parseInt(tahun_barang) || item.tahun_barang,
-        harga_barang !== undefined ? parseFloat(harga_barang) : item.harga_barang,
+        lokasi_barang !== undefined ? lokasi_barang.trim() : item.lokasi_barang,
         foto_barang,
-        keterangan !== undefined ? keterangan : item.keterangan,
+        keterangan !== undefined ? (keterangan ? keterangan.trim() : null) : item.keterangan,
         id
       ]
     );

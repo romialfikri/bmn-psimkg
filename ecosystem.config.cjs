@@ -1,7 +1,7 @@
 module.exports = {
   apps: [
     {
-      name: 'bmn-backend',
+      name: 'bmn-api',
       cwd: './backend',
       script: 'server.js',
       instances: 1,
@@ -14,16 +14,17 @@ module.exports = {
       }
     },
     {
-      name: 'bmn-frontend',
-      cwd: './frontend',
-      script: 'node_modules/.bin/vite',
-      args: 'preview --port 3022 --host 0.0.0.0',
+      name: 'bmn-web',
+      cwd: './',
+      script: 'server-static.js',
       instances: 1,
       autorestart: true,
       watch: false,
       max_memory_restart: '300M',
       env: {
-        NODE_ENV: 'production'
+        NODE_ENV: 'production',
+        PORT: 3022,
+        BACKEND_PORT: 8022
       }
     }
   ]
