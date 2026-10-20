@@ -81,6 +81,48 @@ function App() {
   const [addPinjamPreview, setAddPinjamPreview] = useState('');
   const [isSubmittingPinjam, setIsSubmittingPinjam] = useState(false);
 
+  // Servis Page State
+  const [servisData, setServisData] = useState([]);
+  const [servisStats, setServisStats] = useState({ totalSemua: 0, totalDiajukan: 0, totalSedangDiservis: 0, totalSelesai: 0 });
+  const [servisStatusFilter, setServisStatusFilter] = useState('Semua');
+  const [servisBidangFilter, setServisBidangFilter] = useState('Semua');
+  const [servisSearch, setServisSearch] = useState('');
+  const [servisPage, setServisPage] = useState(1);
+  const [servisTotalPages, setServisTotalPages] = useState(1);
+  const [isAddServisModalOpen, setIsAddServisModalOpen] = useState(false);
+  const [isUpdateServisModalOpen, setIsUpdateServisModalOpen] = useState(false);
+  const [selectedServisItem, setSelectedServisItem] = useState(null);
+
+  const [addServisForm, setAddServisForm] = useState({
+    pilihDariBmn: true,
+    barang_id: '',
+    no_bmn: '',
+    nup: '',
+    nama_barang: '',
+    bidang: 'Meteorologi',
+    nama_pengaju: '',
+    kontak_pengaju: '',
+    tanggal_keluar: new Date().toISOString().split('T')[0],
+    tanggal_kembali: '',
+    tempat_servis: '',
+    keluhan_kerusakan: '',
+    biaya_servis: '',
+    status: 'Diajukan'
+  });
+  const [addServisFile, setAddServisFile] = useState(null);
+  const [addServisPreview, setAddServisPreview] = useState('');
+  const [isSubmittingServis, setIsSubmittingServis] = useState(false);
+
+  const [updateServisForm, setUpdateServisForm] = useState({
+    status: 'Sedang Diservis',
+    tanggal_kembali: '',
+    hasil_servis: '',
+    biaya_servis: ''
+  });
+
+  // Auth checking state for access gate
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+
   // Login State
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
   const [loginError, setLoginError] = useState('');
@@ -141,27 +183,38 @@ function App() {
       .then(res => {
         if (res.data.success || res.data.data) {
           setUser(res.data.data);
+        } else {
+          setToken(null);
+          setUser(null);
+          localStorage.removeItem('bmn_token');
         }
       })
       .catch(() => {
         setToken(null);
         setUser(null);
         localStorage.removeItem('bmn_token');
+      })
+      .finally(() => {
+        setIsCheckingAuth(false);
       });
     } else {
       setUser(null);
+      setIsCheckingAuth(false);
     }
   }, [token]);
 
   useEffect(() => {
+    if (!user) return;
     if (currentPage === 'dashboard') {
       fetchDashboard();
     } else if (['meteorologi', 'klimatologi', 'geofisika', 'tatausaha'].includes(currentPage)) {
       fetchBidangData(getBidangName(currentPage), search, page);
     } else if (currentPage === 'peminjaman') {
       fetchPeminjamanData(peminjamanStatusFilter, peminjamanBidangFilter, peminjamanSearch, peminjamanPage);
+    } else if (currentPage === 'servis') {
+      fetchServisData(servisStatusFilter, servisBidangFilter, servisSearch, servisPage);
     }
-  }, [currentPage, page, peminjamanPage, peminjamanStatusFilter, peminjamanBidangFilter]);
+  }, [user, currentPage, page, peminjamanPage, peminjamanStatusFilter, peminjamanBidangFilter, servisPage, servisStatusFilter, servisBidangFilter]);
 
   // --- API Calls ---
   const fetchDashboard = async () => {
@@ -207,6 +260,29 @@ function App() {
     } catch (err) {
       console.error('Error fetching peminjaman data:', err);
       showToast('Gagal memuat data peminjaman barang', 'error');
+    }
+  };
+
+  const fetchServisData = async (status = servisStatusFilter, bidang = servisBidangFilter, searchStr = servisSearch, pageNum = servisPage) => {
+    try {
+      let url = apiUrl(`/api/servis?page=${pageNum}&limit=10`);
+      if (status && status !== 'Semua') url += `&status=${encodeURIComponent(status)}`;
+      if (bidang && bidang !== 'Semua') url += `&bidang=${encodeURIComponent(bidang)}`;
+      if (searchStr.trim()) url += `&search=${encodeURIComponent(searchStr.trim())}`;
+
+      const res = await axios.get(url, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
+      if (res.data && res.data.success) {
+        setServisData(res.data.data);
+        setServisTotalPages(res.data.totalPages || 1);
+        if (res.data.stats) {
+          setServisStats(res.data.stats);
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching servis data:', err);
+      showToast('Gagal memuat data pengajuan servis', 'error');
     }
   };
 
@@ -463,6 +539,148 @@ function App() {
     }
   };
 
+  // --- Event Handlers: Servis ---
+  const handleServisSearchSubmit = (e) => {
+    e.preventDefault();
+    setServisPage(1);
+    fetchServisData(servisStatusFilter, servisBidangFilter, servisSearch, 1);
+  };
+
+  const openAddServisModal = () => {
+    setAddServisForm({
+      pilihDariBmn: true,
+      barang_id: '',
+      no_bmn: '',
+      nup: '',
+      nama_barang: '',
+      bidang: user?.bidang && user?.bidang !== 'Semua' ? user.bidang : 'Meteorologi',
+      nama_pengaju: user?.nama || '',
+      kontak_pengaju: '',
+      tanggal_keluar: new Date().toISOString().split('T')[0],
+      tanggal_kembali: '',
+      tempat_servis: '',
+      keluhan_kerusakan: '',
+      biaya_servis: '',
+      status: 'Diajukan'
+    });
+    setAddServisFile(null);
+    setAddServisPreview('');
+    setIsAddServisModalOpen(true);
+    fetchBmnOptions();
+  };
+
+  const handleSelectBmnServisItem = (barangId) => {
+    if (!barangId) {
+      setAddServisForm(prev => ({
+        ...prev,
+        barang_id: '',
+        no_bmn: '',
+        nup: '',
+        nama_barang: ''
+      }));
+      return;
+    }
+    const found = bmnOptions.find(b => String(b.id) === String(barangId));
+    if (found) {
+      setAddServisForm(prev => ({
+        ...prev,
+        barang_id: found.id,
+        no_bmn: found.no_bmn || '',
+        nup: found.nup || '',
+        nama_barang: found.nama_barang || '',
+        bidang: found.bidang || prev.bidang
+      }));
+    }
+  };
+
+  const handleAddServisSubmit = async (e) => {
+    e.preventDefault();
+    if (!addServisForm.nama_barang || !addServisForm.keluhan_kerusakan || !addServisForm.tanggal_keluar) {
+      showToast('Nama barang, keluhan kerusakan, dan tanggal keluar wajib diisi', 'error');
+      return;
+    }
+    setIsSubmittingServis(true);
+    try {
+      const formData = new FormData();
+      if (addServisForm.barang_id) formData.append('barang_id', addServisForm.barang_id);
+      formData.append('no_bmn', addServisForm.no_bmn);
+      formData.append('nup', addServisForm.nup);
+      formData.append('nama_barang', addServisForm.nama_barang);
+      formData.append('bidang', addServisForm.bidang);
+      formData.append('nama_pengaju', addServisForm.nama_pengaju);
+      formData.append('kontak_pengaju', addServisForm.kontak_pengaju);
+      formData.append('tanggal_keluar', addServisForm.tanggal_keluar);
+      if (addServisForm.tanggal_kembali) formData.append('tanggal_kembali', addServisForm.tanggal_kembali);
+      formData.append('tempat_servis', addServisForm.tempat_servis);
+      formData.append('keluhan_kerusakan', addServisForm.keluhan_kerusakan);
+      formData.append('biaya_servis', addServisForm.biaya_servis || '0');
+      formData.append('status', addServisForm.status);
+
+      if (addServisFile) {
+        formData.append('foto_barang', addServisFile);
+      }
+
+      await axios.post(apiUrl('/api/servis'), formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+
+      showToast('Pengajuan servis berhasil disimpan', 'success');
+      setIsAddServisModalOpen(false);
+      fetchServisData(servisStatusFilter, servisBidangFilter, servisSearch, 1);
+    } catch (err) {
+      console.error('Error submitting servis:', err);
+      showToast(err.response?.data?.error || 'Gagal menyimpan pengajuan servis', 'error');
+    } finally {
+      setIsSubmittingServis(false);
+    }
+  };
+
+  const openUpdateServisModal = (item) => {
+    setSelectedServisItem(item);
+    setUpdateServisForm({
+      status: item.status || 'Sedang Diservis',
+      tanggal_kembali: item.tanggal_kembali || new Date().toISOString().split('T')[0],
+      hasil_servis: item.hasil_servis || '',
+      biaya_servis: item.biaya_servis || ''
+    });
+    setIsUpdateServisModalOpen(true);
+  };
+
+  const handleUpdateServisSubmit = async (e) => {
+    e.preventDefault();
+    if (!selectedServisItem) return;
+    try {
+      await axios.put(apiUrl(`/api/servis/${selectedServisItem.id}/status`), updateServisForm, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      showToast(`Status servis "${selectedServisItem.nama_barang}" berhasil diperbarui`, 'success');
+      setIsUpdateServisModalOpen(false);
+      setSelectedServisItem(null);
+      fetchServisData(servisStatusFilter, servisBidangFilter, servisSearch, servisPage);
+    } catch (err) {
+      console.error('Error updating servis status:', err);
+      showToast(err.response?.data?.error || 'Gagal memperbarui status servis', 'error');
+    }
+  };
+
+  const handleDeleteServis = async (id) => {
+    if (!window.confirm('Apakah Anda yakin ingin menghapus data pengajuan servis ini?')) return;
+    try {
+      await axios.delete(apiUrl(`/api/servis/${id}`), {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      showToast('Data pengajuan servis berhasil dihapus', 'success');
+      fetchServisData(servisStatusFilter, servisBidangFilter, servisSearch, servisPage);
+    } catch (err) {
+      console.error('Error deleting servis:', err);
+      showToast('Gagal menghapus data pengajuan servis', 'error');
+    }
+  };
+
   // --- Render Helpers ---
   const renderNavbar = () => {
     const navItems = [
@@ -471,7 +689,8 @@ function App() {
       { id: 'klimatologi', label: 'Klimatologi' },
       { id: 'geofisika', label: 'Geofisika' },
       { id: 'tatausaha', label: 'Tata Usaha' },
-      { id: 'peminjaman', label: 'Barang Dipinjam' }
+      { id: 'peminjaman', label: 'Barang Dipinjam' },
+      { id: 'servis', label: 'Pengajuan Servis' }
     ];
 
     return (
@@ -485,6 +704,8 @@ function App() {
                 setCurrentPage(p.id);
                 if (p.id === 'peminjaman') {
                   setPeminjamanPage(1);
+                } else if (p.id === 'servis') {
+                  setServisPage(1);
                 } else {
                   setSearch('');
                   setPage(1);
@@ -525,6 +746,11 @@ function App() {
           <div className="stat-card dipinjam" style={{ cursor: 'pointer' }} onClick={() => setCurrentPage('peminjaman')} title="Lihat daftar barang yang dipinjam">
             <h3>Barang Sedang Dipinjam</h3>
             <div className="stat-value" style={{ color: '#d97706' }}>{totalDipinjam || 0}</div>
+            <div className="stat-sub">Klik untuk melihat detail &rarr;</div>
+          </div>
+          <div className="stat-card sedang-servis" style={{ cursor: 'pointer' }} onClick={() => setCurrentPage('servis')} title="Lihat daftar pengajuan servis barang">
+            <h3>Barang Sedang Diservis</h3>
+            <div className="stat-value" style={{ color: '#b45309' }}>{dashboardData?.totalSedangDiservis || 0}</div>
             <div className="stat-sub">Klik untuk melihat detail &rarr;</div>
           </div>
           {['Meteorologi', 'Klimatologi', 'Geofisika', 'Tata Usaha'].map(b => {
@@ -929,11 +1155,277 @@ function App() {
     );
   };
 
+  const renderServisPage = () => {
+    return (
+      <div>
+        <h2 className="dashboard-title">Pengajuan Servis Barang BMN - PSIMKG</h2>
+
+        {/* Stats Grid */}
+        <div className="stats-grid">
+          <div className="stat-card servis">
+            <h3>Total Pengajuan Servis</h3>
+            <div className="stat-value">{servisStats.totalSemua || 0}</div>
+            <div className="stat-sub">Riwayat Servis BMN</div>
+          </div>
+          <div className="stat-card sedang-servis">
+            <h3>Sedang Diservis</h3>
+            <div className="stat-value" style={{ color: '#b45309' }}>
+              {(servisStats.totalSedangDiservis || 0) + (servisStats.totalDiajukan || 0)}
+            </div>
+            <div className="stat-sub">
+              {servisStats.totalDiajukan || 0} Diajukan, {servisStats.totalSedangDiservis || 0} Dalam Pengerjaan
+            </div>
+          </div>
+          <div className="stat-card dikembalikan">
+            <h3>Selesai Diperbaiki</h3>
+            <div className="stat-value" style={{ color: '#16a34a' }}>
+              {servisStats.totalSelesai || 0}
+            </div>
+            <div className="stat-sub">Barang Sudah Kembali</div>
+          </div>
+        </div>
+
+        {/* Controls Bar */}
+        <div className="controls-bar" style={{ flexWrap: 'wrap', gap: '0.75rem' }}>
+          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            <button className="btn btn-primary" onClick={openAddServisModal}>
+              + Ajukan Servis Barang
+            </button>
+
+            {/* Filter Tabs */}
+            <div className="filter-tabs">
+              {['Semua', 'Diajukan', 'Sedang Diservis', 'Selesai'].map(st => (
+                <button
+                  key={st}
+                  className={`filter-tab ${servisStatusFilter === st ? 'active' : ''}`}
+                  onClick={() => {
+                    setServisStatusFilter(st);
+                    setServisPage(1);
+                  }}
+                >
+                  {st}
+                  <span className="filter-count">
+                    {st === 'Semua' && (servisStats.totalSemua || 0)}
+                    {st === 'Diajukan' && (servisStats.totalDiajukan || 0)}
+                    {st === 'Sedang Diservis' && (servisStats.totalSedangDiservis || 0)}
+                    {st === 'Selesai' && (servisStats.totalSelesai || 0)}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            {/* Filter Bidang */}
+            <select
+              className="form-control"
+              style={{ width: 'auto', padding: '0.45rem 0.75rem', fontSize: '0.88rem' }}
+              value={servisBidangFilter}
+              onChange={e => {
+                setServisBidangFilter(e.target.value);
+                setServisPage(1);
+              }}
+            >
+              <option value="Semua">Semua Bidang</option>
+              <option value="Meteorologi">Meteorologi</option>
+              <option value="Klimatologi">Klimatologi</option>
+              <option value="Geofisika">Geofisika</option>
+              <option value="Tata Usaha">Tata Usaha</option>
+            </select>
+
+            {/* Search */}
+            <form onSubmit={handleServisSearchSubmit} className="search-box">
+              <input
+                type="text"
+                placeholder="Cari barang, no BMN, pengaju, vendor..."
+                value={servisSearch}
+                onChange={e => setServisSearch(e.target.value)}
+              />
+              <button type="submit" className="btn btn-primary btn-sm">Cari</button>
+              {servisSearch && (
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => {
+                    setServisSearch('');
+                    setServisPage(1);
+                    fetchServisData(servisStatusFilter, servisBidangFilter, '', 1);
+                  }}
+                >
+                  Reset
+                </button>
+              )}
+            </form>
+          </div>
+        </div>
+
+        {/* Table */}
+        <div className="table-container">
+          <table className="bmn-table">
+            <thead>
+              <tr>
+                <th style={{ width: '40px' }}>No</th>
+                <th>Foto</th>
+                <th>No BMN / NUP</th>
+                <th>Nama Barang & Bidang</th>
+                <th>Pengaju</th>
+                <th style={{ minWidth: '150px' }}>Tanggal Servis</th>
+                <th>Tempat Servis / Vendor</th>
+                <th>Keluhan / Kerusakan</th>
+                <th>Biaya</th>
+                <th>Status</th>
+                <th>Hasil Servis</th>
+                <th>Aksi</th>
+              </tr>
+            </thead>
+            <tbody>
+              {servisData.length === 0 ? (
+                <tr>
+                  <td colSpan="12" className="empty-state">
+                    Belum ada data pengajuan servis barang.
+                  </td>
+                </tr>
+              ) : (
+                servisData.map((item, idx) => {
+                  const statusClass = item.status === 'Diajukan' ? 'diajukan' :
+                                      item.status === 'Sedang Diservis' ? 'sedang-diservis' :
+                                      item.status === 'Selesai' ? 'selesai' : 'dibatalkan';
+                  const isSelesai = item.status === 'Selesai';
+
+                  return (
+                    <tr key={item.id}>
+                      <td>{(servisPage - 1) * 10 + idx + 1}</td>
+                      <td>
+                        {item.foto_barang ? (
+                          <img
+                            src={apiUrl(`/uploads/${item.foto_barang}`)}
+                            alt="Foto Barang"
+                            className="thumbnail"
+                            onClick={() => setLightboxImage(apiUrl(`/uploads/${item.foto_barang}`))}
+                          />
+                        ) : (
+                          <div className="no-image">No Image</div>
+                        )}
+                      </td>
+                      <td>
+                        <div className="nobmn-cell">{item.no_bmn || '-'}</div>
+                        {item.nup && <div className="nup-cell">NUP: {item.nup}</div>}
+                      </td>
+                      <td>
+                        <div style={{ fontWeight: 600, color: 'var(--text)' }}>{item.nama_barang}</div>
+                        <div style={{ fontSize: '0.8rem', color: 'var(--text-light)', marginTop: '0.15rem' }}>
+                          <span className="lokasi-badge" style={{ backgroundColor: '#e0f2fe', color: '#0369a1', borderColor: '#bae6fd' }}>
+                            {item.bidang}
+                          </span>
+                        </div>
+                      </td>
+                      <td>
+                        <div className="peminjam-cell">
+                          <span className="peminjam-nama">{item.nama_pengaju}</span>
+                          {item.kontak_pengaju && (
+                            <span className="peminjam-kontak">📞 {item.kontak_pengaju}</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="date-cell">
+                        <div>
+                          <strong style={{ color: '#0369a1' }}>Keluar:</strong> {formatDate(item.tanggal_keluar)}
+                        </div>
+                        {item.tanggal_kembali ? (
+                          <div style={{ marginTop: '0.25rem', color: isSelesai ? '#16a34a' : '#b45309', fontSize: '0.82rem' }}>
+                            <strong>{isSelesai ? 'Kembali:' : 'Est. Kembali:'}</strong> {formatDate(item.tanggal_kembali)}
+                          </div>
+                        ) : (
+                          <div style={{ marginTop: '0.25rem', color: '#94a3b8', fontSize: '0.8rem' }}>
+                            <em>Belum dijadwalkan</em>
+                          </div>
+                        )}
+                      </td>
+                      <td>
+                        <div style={{ fontWeight: 500 }}>{item.tempat_servis || '-'}</div>
+                      </td>
+                      <td>
+                        <div style={{ maxWidth: '240px', fontSize: '0.85rem' }}>
+                          {item.keluhan_kerusakan}
+                        </div>
+                      </td>
+                      <td style={{ whiteSpace: 'nowrap', fontSize: '0.85rem', fontWeight: 600 }}>
+                        {item.biaya_servis > 0 ? formatRupiah(item.biaya_servis) : '-'}
+                      </td>
+                      <td>
+                        <span className={`status-badge ${statusClass}`}>
+                          <span className="status-dot"></span>
+                          {item.status}
+                        </span>
+                      </td>
+                      <td>
+                        <div style={{ maxWidth: '200px', fontSize: '0.83rem', color: 'var(--text-light)' }}>
+                          {item.hasil_servis || '-'}
+                        </div>
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', gap: '0.4rem', flexDirection: 'column' }}>
+                          <button
+                            className="btn btn-sm btn-primary"
+                            style={{ whiteSpace: 'nowrap', fontSize: '0.78rem' }}
+                            onClick={() => openUpdateServisModal(item)}
+                          >
+                            Update Status
+                          </button>
+                          {user?.role === 'admin' && (
+                            <button
+                              className="btn btn-sm btn-danger"
+                              style={{ whiteSpace: 'nowrap', fontSize: '0.78rem' }}
+                              onClick={() => handleDeleteServis(item.id)}
+                            >
+                              Hapus
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination */}
+        {servisTotalPages > 1 && (
+          <div className="pagination">
+            <button
+              className="btn-page"
+              disabled={servisPage === 1}
+              onClick={() => setServisPage(p => p - 1)}
+            >
+              Sebelumnya
+            </button>
+            <span className="page-info">Halaman {servisPage} dari {servisTotalPages}</span>
+            <button
+              className="btn-page"
+              disabled={servisPage >= servisTotalPages}
+              onClick={() => setServisPage(p => p + 1)}
+            >
+              Selanjutnya
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const renderLoginPage = () => (
-    <div className="login-container">
-      <div className="login-card">
-        <h2>Login Sistem BMN</h2>
-        <p className="login-subtitle">Masuk untuk mengelola data BMN & peminjaman</p>
+    <div className="login-gate-wrapper">
+      <div className="login-gate-card">
+        <div className="login-gate-header">
+          <img src={apiUrl("/logo-bmkg.png")} alt="Logo BMKG" className="gate-logo" />
+          <h2>Akses Masuk Sistem BMN</h2>
+          <p>Pusat Standardisasi Instrumen MKG (PSIMKG)</p>
+          <p style={{ marginTop: '0.35rem', fontSize: '0.82rem', color: '#64748b' }}>
+            Silakan login terlebih dahulu untuk mengakses Dashboard dan pengelolaan BMN
+          </p>
+        </div>
         {loginError && <div className="login-error">{loginError}</div>}
         <form onSubmit={handleLogin}>
           <div className="form-group">
@@ -956,11 +1448,13 @@ function App() {
               placeholder="Masukkan password"
             />
           </div>
-          <button type="submit" className="btn btn-primary btn-login">Login</button>
+          <button type="submit" className="btn btn-primary btn-login" style={{ width: '100%', padding: '0.75rem', fontSize: '1rem', marginTop: '0.5rem' }}>
+            Masuk ke Sistem
+          </button>
         </form>
-        <div className="login-info">
-          <strong>Akun yang tersedia:</strong>
-          <code>admin</code> / <code>admin123</code> — Administrator (semua bidang)<br/>
+        <div className="login-info" style={{ marginTop: '1.5rem' }}>
+          <strong>Akun Pengguna yang Tersedia:</strong>
+          <code>admin</code> / <code>admin123</code> — Administrator (Semua Bidang)<br/>
           <code>meteorologi</code> / <code>meteorologi123</code> — Bidang Meteorologi<br/>
           <code>klimatologi</code> / <code>klimatologi123</code> — Bidang Klimatologi<br/>
           <code>geofisika</code> / <code>geofisika123</code> — Bidang Geofisika<br/>
@@ -1366,6 +1860,317 @@ function App() {
     );
   };
 
+  const renderAddServisModal = () => {
+    if (!isAddServisModalOpen) return null;
+
+    return (
+      <div className="modal-overlay" onClick={() => setIsAddServisModalOpen(false)}>
+        <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '640px' }}>
+          <div className="modal-header">
+            <h2>Form Pengajuan Servis Barang BMN</h2>
+            <button type="button" className="close-btn" onClick={() => setIsAddServisModalOpen(false)}>&times;</button>
+          </div>
+          <form onSubmit={handleAddServisSubmit} className="bmn-form">
+            <div className="form-group">
+              <label>Pilih Sumber Data Barang</label>
+              <div style={{ display: 'flex', gap: '1.5rem', marginTop: '0.25rem' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontWeight: 500 }}>
+                  <input
+                    type="radio"
+                    name="sumberBarangServis"
+                    checked={addServisForm.pilihDariBmn}
+                    onChange={() => setAddServisForm({ ...addServisForm, pilihDariBmn: true })}
+                  />
+                  Pilih dari Inventaris BMN
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontWeight: 500 }}>
+                  <input
+                    type="radio"
+                    name="sumberBarangServis"
+                    checked={!addServisForm.pilihDariBmn}
+                    onChange={() => setAddServisForm({ ...addServisForm, pilihDariBmn: false, barang_id: '' })}
+                  />
+                  Input Barang Baru / Manual
+                </label>
+              </div>
+            </div>
+
+            {addServisForm.pilihDariBmn && (
+              <div className="form-group">
+                <label>Pilih Barang BMN *</label>
+                <select
+                  required
+                  value={addServisForm.barang_id}
+                  onChange={e => handleSelectBmnServisItem(e.target.value)}
+                >
+                  <option value="">-- Pilih Barang dari Inventaris --</option>
+                  {bmnOptions.map(b => (
+                    <option key={b.id} value={b.id}>
+                      {b.nama_barang} {b.no_bmn ? `(BMN: ${b.no_bmn})` : ''} {b.nup ? `[NUP: ${b.nup}]` : ''} - {b.bidang}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div className="form-row">
+              <div className="form-group">
+                <label>No BMN</label>
+                <input
+                  type="text"
+                  placeholder="Contoh: 3.01.01.01.001"
+                  value={addServisForm.no_bmn}
+                  onChange={e => setAddServisForm({ ...addServisForm, no_bmn: e.target.value })}
+                />
+              </div>
+              <div className="form-group">
+                <label>NUP</label>
+                <input
+                  type="text"
+                  placeholder="Contoh: 1, 2, dst."
+                  value={addServisForm.nup}
+                  onChange={e => setAddServisForm({ ...addServisForm, nup: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label>Nama Barang *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Nama alat atau barang yang akan diservis"
+                  value={addServisForm.nama_barang}
+                  onChange={e => setAddServisForm({ ...addServisForm, nama_barang: e.target.value })}
+                />
+              </div>
+              <div className="form-group">
+                <label>Bidang *</label>
+                <select
+                  value={addServisForm.bidang}
+                  onChange={e => setAddServisForm({ ...addServisForm, bidang: e.target.value })}
+                >
+                  <option value="Meteorologi">Meteorologi</option>
+                  <option value="Klimatologi">Klimatologi</option>
+                  <option value="Geofisika">Geofisika</option>
+                  <option value="Tata Usaha">Tata Usaha</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label>Nama Pengaju / Pemohon Servis *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Nama pegawai / teknisi pengaju"
+                  value={addServisForm.nama_pengaju}
+                  onChange={e => setAddServisForm({ ...addServisForm, nama_pengaju: e.target.value })}
+                />
+              </div>
+              <div className="form-group">
+                <label>Kontak Pengaju (No HP / WA)</label>
+                <input
+                  type="text"
+                  placeholder="Contoh: 0812xxxxxxxx"
+                  value={addServisForm.kontak_pengaju}
+                  onChange={e => setAddServisForm({ ...addServisForm, kontak_pengaju: e.target.value })}
+                />
+              </div>
+            </div>
+
+            {/* FITUR TANGGAL BARANG KELUAR & DIKEMBALIKAN */}
+            <div className="form-row" style={{ background: '#f0f9ff', padding: '0.85rem', borderRadius: '8px', border: '1px solid #bae6fd', marginBottom: '1rem' }}>
+              <div className="form-group" style={{ margin: 0 }}>
+                <label style={{ color: '#0369a1', fontWeight: 600 }}>
+                  📅 Tanggal Barang Keluar (Servis) *
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={addServisForm.tanggal_keluar}
+                  onChange={e => setAddServisForm({ ...addServisForm, tanggal_keluar: e.target.value })}
+                />
+                <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Tanggal barang diserahkan/keluar untuk diservis</span>
+              </div>
+              <div className="form-group" style={{ margin: 0 }}>
+                <label style={{ color: '#16a34a', fontWeight: 600 }}>
+                  📅 Tanggal Barang Dikembalikan (Estimasi)
+                </label>
+                <input
+                  type="date"
+                  value={addServisForm.tanggal_kembali}
+                  onChange={e => setAddServisForm({ ...addServisForm, tanggal_kembali: e.target.value })}
+                />
+                <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Rencana atau perkiraan barang selesai dan kembali</span>
+              </div>
+            </div>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label>Tempat Servis / Vendor / Teknisi</label>
+                <input
+                  type="text"
+                  placeholder="Contoh: Service Center Resmi / Bengkel Kalibrasi"
+                  value={addServisForm.tempat_servis}
+                  onChange={e => setAddServisForm({ ...addServisForm, tempat_servis: e.target.value })}
+                />
+              </div>
+              <div className="form-group">
+                <label>Estimasi Biaya Servis (Rp)</label>
+                <input
+                  type="number"
+                  placeholder="0"
+                  value={addServisForm.biaya_servis}
+                  onChange={e => setAddServisForm({ ...addServisForm, biaya_servis: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label>Keluhan / Kerusakan Barang *</label>
+              <textarea
+                required
+                rows="3"
+                placeholder="Jelaskan detail kerusakan, error alat, atau suku cadang yang bermasalah..."
+                value={addServisForm.keluhan_kerusakan}
+                onChange={e => setAddServisForm({ ...addServisForm, keluhan_kerusakan: e.target.value })}
+              ></textarea>
+            </div>
+
+            <div className="form-group">
+              <label>Foto Kondisi Barang / Kerusakan (Opsional)</label>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={e => {
+                  const file = e.target.files[0];
+                  if (file) {
+                    setAddServisFile(file);
+                    setAddServisPreview(URL.createObjectURL(file));
+                  }
+                }}
+              />
+              {addServisPreview && (
+                <div style={{ marginTop: '0.5rem' }}>
+                  <img src={addServisPreview} alt="Preview" style={{ height: '80px', borderRadius: '4px', objectFit: 'cover' }} />
+                </div>
+              )}
+            </div>
+
+            <div className="form-actions">
+              <button type="button" className="btn btn-secondary" onClick={() => setIsAddServisModalOpen(false)}>
+                Batal
+              </button>
+              <button type="submit" className="btn btn-primary" disabled={isSubmittingServis}>
+                {isSubmittingServis ? 'Menyimpan...' : 'Ajukan Servis'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  };
+
+  const renderUpdateServisModal = () => {
+    if (!isUpdateServisModalOpen || !selectedServisItem) return null;
+
+    return (
+      <div className="modal-overlay" onClick={() => setIsUpdateServisModalOpen(false)}>
+        <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '560px' }}>
+          <div className="modal-header">
+            <h2>Update Status & Pengembalian Servis</h2>
+            <button type="button" className="close-btn" onClick={() => setIsUpdateServisModalOpen(false)}>&times;</button>
+          </div>
+          <form onSubmit={handleUpdateServisSubmit} className="bmn-form">
+            <div style={{ background: '#f8fafc', padding: '0.85rem', borderRadius: '8px', marginBottom: '1.2rem', border: '1px solid #e2e8f0' }}>
+              <div style={{ fontWeight: 700, color: 'var(--primary)', fontSize: '1.05rem' }}>
+                {selectedServisItem.nama_barang}
+              </div>
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-light)', marginTop: '0.25rem', lineHeight: '1.6' }}>
+                <div><strong>No BMN:</strong> {selectedServisItem.no_bmn || '-'} {selectedServisItem.nup ? `(NUP: ${selectedServisItem.nup})` : ''} | <strong>Bidang:</strong> {selectedServisItem.bidang}</div>
+                <div><strong>Pengaju:</strong> {selectedServisItem.nama_pengaju}</div>
+                <div><strong>Tanggal Keluar Servis:</strong> {formatDate(selectedServisItem.tanggal_keluar)}</div>
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label>Status Servis *</label>
+              <select
+                value={updateServisForm.status}
+                onChange={e => {
+                  const newStatus = e.target.value;
+                  setUpdateServisForm(prev => ({
+                    ...prev,
+                    status: newStatus,
+                    tanggal_kembali: newStatus === 'Selesai' && !prev.tanggal_kembali ? new Date().toISOString().split('T')[0] : prev.tanggal_kembali
+                  }));
+                }}
+              >
+                <option value="Diajukan">Diajukan (Menunggu Konfirmasi / Jadwal Keluar)</option>
+                <option value="Sedang Diservis">Sedang Diservis (Dalam Pengerjaan)</option>
+                <option value="Selesai">Selesai (Barang Telah Selesai & Kembali)</option>
+                <option value="Dibatalkan">Dibatalkan</option>
+              </select>
+            </div>
+
+            {/* FITUR TANGGAL BARANG DIKEMBALIKAN */}
+            <div className="form-group">
+              <label style={{ fontWeight: 600, color: updateServisForm.status === 'Selesai' ? '#16a34a' : 'var(--text)' }}>
+                📅 Tanggal Barang Dikembalikan {updateServisForm.status === 'Selesai' ? '(Aktual Selesai & Diterima)' : '(Estimasi Rencana)'}
+              </label>
+              <input
+                type="date"
+                value={updateServisForm.tanggal_kembali || ''}
+                onChange={e => setUpdateServisForm({ ...updateServisForm, tanggal_kembali: e.target.value })}
+              />
+              <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                {updateServisForm.status === 'Selesai'
+                  ? 'Catat tanggal barang resmi diterima kembali di kantor setelah perbaikan'
+                  : 'Tanggal perkiraan barang selesai diperbaiki'}
+              </span>
+            </div>
+
+            <div className="form-group">
+              <label>Hasil Servis / Tindakan Perbaikan</label>
+              <textarea
+                rows="3"
+                placeholder="Contoh: Selesai diperbaiki, komponen sensor diganti baru, telah dilakukan uji fungsi dan kalibrasi..."
+                value={updateServisForm.hasil_servis}
+                onChange={e => setUpdateServisForm({ ...updateServisForm, hasil_servis: e.target.value })}
+              ></textarea>
+            </div>
+
+            <div className="form-group">
+              <label>Biaya Akhir / Aktual Servis (Rp)</label>
+              <input
+                type="number"
+                placeholder="0"
+                value={updateServisForm.biaya_servis}
+                onChange={e => setUpdateServisForm({ ...updateServisForm, biaya_servis: e.target.value })}
+              />
+            </div>
+
+            <div className="form-actions">
+              <button type="button" className="btn btn-secondary" onClick={() => setIsUpdateServisModalOpen(false)}>
+                Batal
+              </button>
+              <button
+                type="submit"
+                className="btn btn-primary"
+                style={{ backgroundColor: updateServisForm.status === 'Selesai' ? '#16a34a' : undefined, borderColor: updateServisForm.status === 'Selesai' ? '#16a34a' : undefined }}
+              >
+                Simpan Perubahan
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="app-container">
       {/* ===== HEADER: LOGO BMKG & ENLARGED PSIMKG ON TOP OF SISTEM INFORMASI BMN ===== */}
@@ -1380,23 +2185,38 @@ function App() {
         </div>
       </header>
 
-      {renderNavbar()}
+      {/* Akses Masuk Gate: Navbar HANYA tampil jika user sudah login */}
+      {user && renderNavbar()}
 
       <main className="app-main">
-        {currentPage === 'dashboard' && renderDashboard()}
-        {currentPage === 'login' && renderLoginPage()}
-        {currentPage === 'peminjaman' && renderPeminjamanPage()}
-        {['meteorologi', 'klimatologi', 'geofisika', 'tatausaha'].includes(currentPage) && renderBidangPage(getBidangName(currentPage))}
+        {isCheckingAuth ? (
+          <div className="loading-state">Memeriksa sesi login...</div>
+        ) : !user ? (
+          renderLoginPage()
+        ) : (
+          <>
+            {currentPage === 'dashboard' && renderDashboard()}
+            {currentPage === 'peminjaman' && renderPeminjamanPage()}
+            {currentPage === 'servis' && renderServisPage()}
+            {['meteorologi', 'klimatologi', 'geofisika', 'tatausaha'].includes(currentPage) && renderBidangPage(getBidangName(currentPage))}
+          </>
+        )}
       </main>
 
       <footer className="app-footer">
         <p>&copy; {new Date().getFullYear()} PSIMKG - Pusat Standardisasi Instrumen Meteorologi Klimatologi dan Geofisika</p>
       </footer>
 
-      {renderAddModal()}
-      {renderAddPinjamModal()}
-      {renderReturnModal()}
-      {renderLightbox()}
+      {user && (
+        <>
+          {renderAddModal()}
+          {renderAddPinjamModal()}
+          {renderReturnModal()}
+          {renderAddServisModal()}
+          {renderUpdateServisModal()}
+          {renderLightbox()}
+        </>
+      )}
 
       <div className="toast-container">
         {toasts.map(t => (

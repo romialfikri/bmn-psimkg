@@ -6,6 +6,7 @@ const { getDb } = require('./database');
 const barangRoutes = require('./routes/barang');
 const authRoutes = require('./routes/auth');
 const peminjamanRoutes = require('./routes/peminjaman');
+const servisRoutes = require('./routes/servis');
 
 const app = express();
 const HOST = process.env.HOST || '127.0.0.1';
@@ -30,6 +31,7 @@ app.use(['/uploads', '/bmn/uploads'], express.static(path.join(__dirname, 'uploa
 app.use(['/api/auth', '/bmn/api/auth'], authRoutes);
 app.use(['/api/barang', '/bmn/api/barang'], barangRoutes);
 app.use(['/api/peminjaman', '/bmn/api/peminjaman'], peminjamanRoutes);
+app.use(['/api/servis', '/bmn/api/servis'], servisRoutes);
 
 // Error handling
 app.use((err, req, res, next) => {

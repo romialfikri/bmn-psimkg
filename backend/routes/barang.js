@@ -56,6 +56,15 @@ router.get('/stats/summary', async (req, res) => {
     const dipinjamResult = db.exec("SELECT COUNT(*) as total FROM peminjaman WHERE status = 'Dipinjam'");
     const totalDipinjam = dipinjamResult.length > 0 ? dipinjamResult[0].values[0][0] : 0;
 
+    // Total barang sedang diservis (Diajukan atau Sedang Diservis)
+    let totalSedangDiservis = 0;
+    try {
+      const servisResult = db.exec("SELECT COUNT(*) as total FROM servis WHERE status IN ('Diajukan', 'Sedang Diservis')");
+      totalSedangDiservis = servisResult.length > 0 ? servisResult[0].values[0][0] : 0;
+    } catch (e) {
+      totalSedangDiservis = 0;
+    }
+
     // Per bidang stats
     const bidangStats = {};
     const bidangList = ['Meteorologi', 'Klimatologi', 'Geofisika', 'Tata Usaha'];
@@ -81,6 +90,7 @@ router.get('/stats/summary', async (req, res) => {
       data: {
         total,
         totalDipinjam,
+        totalSedangDiservis,
         bidangStats,
         recentItems,
         perTahun

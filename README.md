@@ -4,7 +4,8 @@ Aplikasi web untuk mengelola **Barang Milik Negara (BMN)** di lingkungan **PSIMK
 
 ## Fitur Utama
 
-- 📊 **Dashboard Ringkasan Eksekutif** - Total BMN, total nilai aset (Rupiah), sebaran BMN per bidang, 5 item terbaru, dan statistik per tahun.
+- 🚪 **Akses Masuk (Login Gate)** - Tampilan login yang aman sebelum pengguna dapat masuk ke Dashboard dan menu aplikasi.
+- 📊 **Dashboard Ringkasan Eksekutif** - Total BMN, total barang dipinjam, total barang sedang diservis, sebaran BMN per bidang, dan 5 item terbaru.
 - 📑 **Halaman Bidang BMN**:
   1. **Meteorologi**
   2. **Klimatologi**
@@ -15,13 +16,19 @@ Aplikasi web untuk mengelola **Barang Milik Negara (BMN)** di lingkungan **PSIMK
   - **Fitur Dipinjamkan Oleh Siapa** (mencatat identitas petugas yang meminjamkan barang).
   - Status aktif ("Sedang Dipinjam") dan riwayat ("Dikembalikan").
   - Tombol aksi cepat pengembalian barang beserta tanggal dan catatan pengembalian.
+- 🛠️ **Halaman Pengajuan Servis Barang BMN**:
+  - Formulir pengajuan perbaikan / servis barang BMN.
+  - **Fitur Tanggal Barang Keluar**: mencatat tanggal barang keluar / diserahkan untuk diservis.
+  - **Fitur Tanggal Barang Dikembalikan**: mencatat tanggal estimasi kembali serta tanggal aktual barang diterima kembali setelah perbaikan.
+  - Informasi tempat servis/vendor, keluhan kerusakan, estimasi dan biaya riil perbaikan, serta foto barang.
+  - Alur status lengkap: `Diajukan` ➜ `Sedang Diservis` ➜ `Selesai` / `Dibatalkan` disertai catatan hasil servis.
 - 🔐 **Autentikasi Berbasis Peran (RBAC)**:
-  - Pengunjung umum hanya dapat melihat data.
-  - Untuk menambah / upload data, pengguna harus login dengan akun bidang masing-masing.
-  - **Hanya Administrator** yang berhak menghapus data BMN.
-- 🏷️ **Field Data Lengkap**: No BMN, NUP, Nama Barang, Bidang, Tahun, Lokasi Ruangan, Harga Barang, Foto, Keterangan, Tanggal Upload.
+  - Login wajib untuk mengakses menu aplikasi.
+  - Operator bidang hanya mengelola data bidang masing-masing.
+  - **Hanya Administrator** yang berhak menghapus data BMN, data peminjaman, dan riwayat servis.
+- 🏷️ **Field Data Lengkap**: No BMN, NUP, Nama Barang, Bidang, Tahun, Lokasi Ruangan, Foto, Keterangan, Tanggal Upload.
 - 🔍 **Fitur Perbesar Foto (Lightbox)** - Klik foto thumbnail pada tabel untuk melihat gambar ukuran penuh.
-- 🔎 **Pencarian & Pagination** - Pencarian real-time berdasarkan nama barang, No BMN, peminjam, atau petugas.
+- 🔎 **Pencarian & Pagination** - Pencarian real-time berdasarkan nama barang, No BMN, peminjam, petugas, vendor, atau keluhan.
 
 ---
 

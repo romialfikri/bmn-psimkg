@@ -66,6 +66,30 @@ async function getDb() {
     )
   `);
 
+  // Create servis table
+  db.run(`
+    CREATE TABLE IF NOT EXISTS servis (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      barang_id INTEGER,
+      no_bmn TEXT,
+      nup TEXT,
+      nama_barang TEXT NOT NULL,
+      bidang TEXT NOT NULL DEFAULT 'Tata Usaha',
+      nama_pengaju TEXT NOT NULL,
+      kontak_pengaju TEXT,
+      tanggal_keluar TEXT NOT NULL,
+      tanggal_kembali TEXT,
+      tempat_servis TEXT,
+      keluhan_kerusakan TEXT NOT NULL,
+      biaya_servis REAL DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'Diajukan',
+      hasil_servis TEXT,
+      foto_barang TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
   // Migration: add new columns if they don't exist (for existing databases)
   try {
     const tableInfo = db.exec("PRAGMA table_info(barang)");
