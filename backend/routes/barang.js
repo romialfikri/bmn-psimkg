@@ -150,7 +150,7 @@ router.get('/', async (req, res) => {
 // GET /api/barang/:id — Single item (public)
 
 // GET /api/barang/export/excel — Download data barang dalam format Excel
-router.get('/export/excel', async (req, res) => {
+router.get('/export/excel', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const db = await getDb();
     const search = req.query.search || '';
@@ -305,7 +305,7 @@ router.get('/export/excel', async (req, res) => {
 });
 
 // GET /api/barang/export/pdf — Download data barang dalam format PDF
-router.get('/export/pdf', async (req, res) => {
+router.get('/export/pdf', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const db = await getDb();
     const search = req.query.search || '';

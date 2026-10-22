@@ -738,30 +738,32 @@ function App() {
       <div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.25rem' }}>
           <h2 className="dashboard-title" style={{ margin: 0 }}>Dashboard BMN - PSIMKG</h2>
-          <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
-            <a
-              href={apiUrl('/api/barang/export/excel?bidang=Semua')}
-              className="btn btn-sm"
-              download
-              target="_blank"
-              rel="noreferrer"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', textDecoration: 'none', backgroundColor: '#16a34a', color: '#fff', border: 'none', padding: '0.45rem 0.85rem', borderRadius: '6px', fontWeight: 600, fontSize: '0.85rem' }}
-              title="Download Seluruh Data BMN (Excel)"
-            >
-              📥 Download Semua (Excel)
-            </a>
-            <a
-              href={apiUrl('/api/barang/export/pdf?bidang=Semua')}
-              className="btn btn-sm"
-              download
-              target="_blank"
-              rel="noreferrer"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', textDecoration: 'none', backgroundColor: '#dc2626', color: '#fff', border: 'none', padding: '0.45rem 0.85rem', borderRadius: '6px', fontWeight: 600, fontSize: '0.85rem' }}
-              title="Download Seluruh Data BMN (PDF)"
-            >
-              📄 Download Semua (PDF)
-            </a>
-          </div>
+          {user && user.role === 'admin' && (
+            <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
+              <a
+                href={apiUrl(`/api/barang/export/excel?bidang=Semua&token=${token || ''}`)}
+                className="btn btn-sm"
+                download
+                target="_blank"
+                rel="noreferrer"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', textDecoration: 'none', backgroundColor: '#16a34a', color: '#fff', border: 'none', padding: '0.45rem 0.85rem', borderRadius: '6px', fontWeight: 600, fontSize: '0.85rem' }}
+                title="Download Seluruh Data BMN (Excel - Khusus Admin)"
+              >
+                📥 Download Semua (Excel)
+              </a>
+              <a
+                href={apiUrl(`/api/barang/export/pdf?bidang=Semua&token=${token || ''}`)}
+                className="btn btn-sm"
+                download
+                target="_blank"
+                rel="noreferrer"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', textDecoration: 'none', backgroundColor: '#dc2626', color: '#fff', border: 'none', padding: '0.45rem 0.85rem', borderRadius: '6px', fontWeight: 600, fontSize: '0.85rem' }}
+                title="Download Seluruh Data BMN (PDF - Khusus Admin)"
+              >
+                📄 Download Semua (PDF)
+              </a>
+            </div>
+          )}
         </div>
 
         <div className="stats-grid">
@@ -858,28 +860,32 @@ function App() {
             {user && (user.role === 'admin' || user.bidang === bidangName) && (
               <button className="btn btn-primary" onClick={() => setIsAddModalOpen(true)}>+ Tambah Data</button>
             )}
-            <a
-              href={apiUrl(`/api/barang/export/excel?bidang=${encodeURIComponent(bidangName)}&search=${encodeURIComponent(search || '')}`)}
-              className="btn btn-sm"
-              download
-              target="_blank"
-              rel="noreferrer"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', textDecoration: 'none', backgroundColor: '#16a34a', color: '#fff', border: 'none', padding: '0.45rem 0.85rem', borderRadius: '6px', fontWeight: 600, fontSize: '0.85rem' }}
-              title="Download Data Barang Format Excel"
-            >
-              📥 Download Excel
-            </a>
-            <a
-              href={apiUrl(`/api/barang/export/pdf?bidang=${encodeURIComponent(bidangName)}&search=${encodeURIComponent(search || '')}`)}
-              className="btn btn-sm"
-              download
-              target="_blank"
-              rel="noreferrer"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', textDecoration: 'none', backgroundColor: '#dc2626', color: '#fff', border: 'none', padding: '0.45rem 0.85rem', borderRadius: '6px', fontWeight: 600, fontSize: '0.85rem' }}
-              title="Download Data Barang Format PDF"
-            >
-              📄 Download PDF
-            </a>
+            {user && user.role === 'admin' && (
+              <>
+                <a
+                  href={apiUrl(`/api/barang/export/excel?bidang=${encodeURIComponent(bidangName)}&search=${encodeURIComponent(search || '')}&token=${token || ''}`)}
+                  className="btn btn-sm"
+                  download
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', textDecoration: 'none', backgroundColor: '#16a34a', color: '#fff', border: 'none', padding: '0.45rem 0.85rem', borderRadius: '6px', fontWeight: 600, fontSize: '0.85rem' }}
+                  title="Download Data Barang Format Excel (Khusus Admin)"
+                >
+                  📥 Download Excel
+                </a>
+                <a
+                  href={apiUrl(`/api/barang/export/pdf?bidang=${encodeURIComponent(bidangName)}&search=${encodeURIComponent(search || '')}&token=${token || ''}`)}
+                  className="btn btn-sm"
+                  download
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', textDecoration: 'none', backgroundColor: '#dc2626', color: '#fff', border: 'none', padding: '0.45rem 0.85rem', borderRadius: '6px', fontWeight: 600, fontSize: '0.85rem' }}
+                  title="Download Data Barang Format PDF (Khusus Admin)"
+                >
+                  📄 Download PDF
+                </a>
+              </>
+            )}
           </div>
           <div className="search-box">
             <form onSubmit={handleSearchSubmit} style={{display:'flex', gap:'0.5rem'}}>

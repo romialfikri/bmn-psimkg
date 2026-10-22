@@ -14,7 +14,7 @@ const USERS = [
 // Middleware: verify JWT token
 function authenticateToken(req, res, next) {
   const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+  const token = (authHeader && authHeader.split(' ')[1]) || req.query.token; // Bearer TOKEN or query parameter
 
   if (!token) {
     return res.status(401).json({ success: false, error: 'Token tidak ditemukan. Silakan login.' });
