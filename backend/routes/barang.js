@@ -4,6 +4,8 @@ const multer = require('multer');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 const fs = require('fs');
+const ExcelJS = require('exceljs');
+const PDFDocument = require('pdfkit');
 const { getDb, saveDb } = require('../database');
 const { authenticateToken, requireAdmin } = require('../middleware/auth');
 
@@ -146,6 +148,324 @@ router.get('/', async (req, res) => {
 });
 
 // GET /api/barang/:id — Single item (public)
+
+// GET /api/barang/export/excel — Download data barang dalam format Excel
+router.get('/export/excel', async (req, res) => {
+  try {
+    const db = await getDb();
+    const search = req.query.search || '';
+    const bidang = req.query.bidang || '';
+
+    const searchTerm = `%${search}%`;
+    let dataQuery, params;
+
+    if (bidang && bidang !== 'Semua') {
+      dataQuery = 'SELECT * FROM barang WHERE bidang = ? AND (nama_barang LIKE ? OR no_bmn LIKE ? OR nup LIKE ? OR lokasi_barang LIKE ?) ORDER BY id ASC';
+      params = [bidang, searchTerm, searchTerm, searchTerm, searchTerm];
+    } else {
+      dataQuery = 'SELECT * FROM barang WHERE (nama_barang LIKE ? OR no_bmn LIKE ? OR nup LIKE ? OR lokasi_barang LIKE ?) ORDER BY id ASC';
+      params = [searchTerm, searchTerm, searchTerm, searchTerm];
+    }
+
+    const stmt = db.prepare(dataQuery);
+    stmt.bind(params);
+    const items = [];
+    while (stmt.step()) {
+      items.push(stmt.getAsObject());
+    }
+    stmt.free();
+
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'BMN PSIMKG';
+    workbook.lastModifiedBy = 'BMN PSIMKG';
+    workbook.created = new Date();
+
+    const worksheet = workbook.addWorksheet('Data BMN', {
+      pageSetup: { paperSize: 9, orientation: 'landscape' }
+    });
+
+    // Judul & Header Info
+    worksheet.mergeCells('A1:H1');
+    const titleCell = worksheet.getCell('A1');
+    titleCell.value = 'BADAN METEOROLOGI, KLIMATOLOGI, DAN GEOFISIKA';
+    titleCell.font = { name: 'Arial', size: 12, bold: true, color: { argb: 'FF0369A1' } };
+    titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+
+    worksheet.mergeCells('A2:H2');
+    const subtitleCell = worksheet.getCell('A2');
+    subtitleCell.value = 'PUSAT STANDARDISASI INSTRUMEN METEOROLOGI KLIMATOLOGI DAN GEOFISIKA';
+    subtitleCell.font = { name: 'Arial', size: 11, bold: true };
+    subtitleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+
+    worksheet.mergeCells('A3:H3');
+    const docTitleCell = worksheet.getCell('A3');
+    docTitleCell.value = 'DAFTAR INVENTARIS BARANG MILIK NEGARA (BMN)';
+    docTitleCell.font = { name: 'Arial', size: 14, bold: true, underline: true };
+    docTitleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+
+    worksheet.mergeCells('A4:H4');
+    const filterInfoCell = worksheet.getCell('A4');
+    filterInfoCell.value = `Bidang: ${bidang && bidang !== 'Semua' ? bidang : 'Semua Bidang'} | Tanggal Unduh: ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`;
+    filterInfoCell.font = { name: 'Arial', size: 10, italic: true };
+    filterInfoCell.alignment = { horizontal: 'center', vertical: 'middle' };
+
+    worksheet.addRow([]); // Baris kosong di baris 5
+
+    // Kolom Header di baris 6
+    const headerRow = worksheet.addRow([
+      'No',
+      'No BMN',
+      'NUP',
+      'Nama Barang',
+      'Bidang',
+      'Tahun',
+      'Lokasi Barang',
+      'Keterangan'
+    ]);
+
+    headerRow.eachCell((cell) => {
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FF0369A1' }
+      };
+      cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FFFFFFFF' } };
+      cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+      cell.border = {
+        top: { style: 'thin' },
+        left: { style: 'thin' },
+        bottom: { style: 'medium' },
+        right: { style: 'thin' }
+      };
+    });
+    headerRow.height = 28;
+
+    // Isi Data
+    items.forEach((item, index) => {
+      const row = worksheet.addRow([
+        index + 1,
+        item.no_bmn || '-',
+        item.nup || '-',
+        item.nama_barang || '-',
+        item.bidang || '-',
+        item.tahun_barang || '-',
+        item.lokasi_barang || '-',
+        item.keterangan || '-'
+      ]);
+
+      const isEven = index % 2 === 0;
+      row.eachCell((cell, colNumber) => {
+        cell.font = { name: 'Arial', size: 9 };
+        cell.border = {
+          top: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+          left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+          bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+          right: { style: 'thin', color: { argb: 'FFE2E8F0' } }
+        };
+        if (isEven) {
+          cell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FFF8FAFC' }
+          };
+        }
+        if (colNumber === 1 || colNumber === 3 || colNumber === 5 || colNumber === 6) {
+          cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        } else {
+          cell.alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
+        }
+      });
+      row.height = 22;
+    });
+
+    // Auto-fit Column Widths
+    worksheet.columns = [
+      { width: 6 },   // No
+      { width: 22 },  // No BMN
+      { width: 10 },  // NUP
+      { width: 35 },  // Nama Barang
+      { width: 16 },  // Bidang
+      { width: 10 },  // Tahun
+      { width: 26 },  // Lokasi
+      { width: 30 }   // Keterangan
+    ];
+
+    const safeBidang = (bidang && bidang !== 'Semua' ? bidang.toLowerCase().replace(/\s+/g, '-') : 'semua');
+    const filename = `Data-BMN-PSIMKG-${safeBidang}-${new Date().toISOString().split('T')[0]}.xlsx`;
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (error) {
+    console.error('Export Excel error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// GET /api/barang/export/pdf — Download data barang dalam format PDF
+router.get('/export/pdf', async (req, res) => {
+  try {
+    const db = await getDb();
+    const search = req.query.search || '';
+    const bidang = req.query.bidang || '';
+
+    const searchTerm = `%${search}%`;
+    let dataQuery, params;
+
+    if (bidang && bidang !== 'Semua') {
+      dataQuery = 'SELECT * FROM barang WHERE bidang = ? AND (nama_barang LIKE ? OR no_bmn LIKE ? OR nup LIKE ? OR lokasi_barang LIKE ?) ORDER BY id ASC';
+      params = [bidang, searchTerm, searchTerm, searchTerm, searchTerm];
+    } else {
+      dataQuery = 'SELECT * FROM barang WHERE (nama_barang LIKE ? OR no_bmn LIKE ? OR nup LIKE ? OR lokasi_barang LIKE ?) ORDER BY id ASC';
+      params = [searchTerm, searchTerm, searchTerm, searchTerm];
+    }
+
+    const stmt = db.prepare(dataQuery);
+    stmt.bind(params);
+    const items = [];
+    while (stmt.step()) {
+      items.push(stmt.getAsObject());
+    }
+    stmt.free();
+
+    const safeBidang = (bidang && bidang !== 'Semua' ? bidang.toLowerCase().replace(/\s+/g, '-') : 'semua');
+    const filename = `Data-BMN-PSIMKG-${safeBidang}-${new Date().toISOString().split('T')[0]}.pdf`;
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+    const doc = new PDFDocument({
+      size: 'A4',
+      layout: 'landscape',
+      margin: 36,
+      bufferPages: true
+    });
+
+    doc.pipe(res);
+
+    // Helper draw header
+    const drawKop = () => {
+      doc.save();
+      doc.font('Helvetica-Bold').fontSize(11).fillColor('#0369a1')
+         .text('BADAN METEOROLOGI, KLIMATOLOGI, DAN GEOFISIKA', { align: 'center' });
+      doc.font('Helvetica-Bold').fontSize(12).fillColor('#0f172a')
+         .text('PUSAT STANDARDISASI INSTRUMEN METEOROLOGI KLIMATOLOGI DAN GEOFISIKA', { align: 'center' });
+      doc.font('Helvetica').fontSize(9).fillColor('#475569')
+         .text('Jl. Angkasa I No.2 Kemayoran, Jakarta Pusat 10610 | Website: psimkg.bmkg.go.id', { align: 'center' });
+      
+      doc.moveDown(0.3);
+      doc.strokeColor('#0284c7').lineWidth(1.5).moveTo(36, doc.y).lineTo(806, doc.y).stroke();
+      doc.moveDown(0.5);
+
+      doc.font('Helvetica-Bold').fontSize(12).fillColor('#1e293b')
+         .text('DAFTAR INVENTARIS BARANG MILIK NEGARA (BMN)', { align: 'center' });
+      doc.font('Helvetica').fontSize(9).fillColor('#64748b')
+         .text(`Bidang: ${bidang && bidang !== 'Semua' ? bidang : 'Semua Bidang'} | Dicetak: ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })} | Total Data: ${items.length} item`, { align: 'center' });
+      doc.moveDown(0.6);
+      doc.restore();
+    };
+
+    drawKop();
+
+    // Table definition
+    const columns = [
+      { key: 'no', label: 'No', width: 30, align: 'center' },
+      { key: 'no_bmn', label: 'No BMN', width: 110, align: 'left' },
+      { key: 'nup', label: 'NUP', width: 40, align: 'center' },
+      { key: 'nama_barang', label: 'Nama Barang', width: 180, align: 'left' },
+      { key: 'bidang', label: 'Bidang', width: 85, align: 'center' },
+      { key: 'tahun_barang', label: 'Tahun', width: 45, align: 'center' },
+      { key: 'lokasi_barang', label: 'Lokasi Barang', width: 130, align: 'left' },
+      { key: 'keterangan', label: 'Keterangan', width: 150, align: 'left' }
+    ];
+
+    const startX = 36;
+    let currentY = doc.y;
+
+    const drawTableHeader = (y) => {
+      doc.save();
+      doc.rect(startX, y, 770, 20).fill('#0284c7');
+      doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#ffffff');
+      
+      let xOffset = startX;
+      columns.forEach(col => {
+        doc.text(col.label, xOffset + 4, y + 5, { width: col.width - 8, align: col.align });
+        xOffset += col.width;
+      });
+      doc.restore();
+      return y + 20;
+    };
+
+    currentY = drawTableHeader(currentY);
+
+    doc.font('Helvetica').fontSize(8);
+    items.forEach((item, index) => {
+      const namaHeight = doc.heightOfString(item.nama_barang || '-', { width: columns[3].width - 8 });
+      const lokasiHeight = doc.heightOfString(item.lokasi_barang || '-', { width: columns[6].width - 8 });
+      const ketHeight = doc.heightOfString(item.keterangan || '-', { width: columns[7].width - 8 });
+      const rowHeight = Math.max(18, namaHeight + 8, lokasiHeight + 8, ketHeight + 8);
+
+      if (currentY + rowHeight > 530) {
+        doc.addPage();
+        drawKop();
+        currentY = drawTableHeader(doc.y);
+      }
+
+      if (index % 2 === 0) {
+        doc.save();
+        doc.rect(startX, currentY, 770, rowHeight).fill('#f8fafc');
+        doc.restore();
+      }
+
+      doc.save();
+      doc.strokeColor('#e2e8f0').lineWidth(0.5).moveTo(startX, currentY + rowHeight).lineTo(startX + 770, currentY + rowHeight).stroke();
+      doc.restore();
+
+      let xOffset = startX;
+      const values = [
+        (index + 1).toString(),
+        item.no_bmn || '-',
+        (item.nup || '-').toString(),
+        item.nama_barang || '-',
+        item.bidang || '-',
+        (item.tahun_barang || '-').toString(),
+        item.lokasi_barang || '-',
+        item.keterangan || '-'
+      ];
+
+      columns.forEach((col, cIdx) => {
+        doc.fillColor('#1e293b').text(values[cIdx], xOffset + 4, currentY + 4, {
+          width: col.width - 8,
+          align: col.align
+        });
+        xOffset += col.width;
+      });
+
+      currentY += rowHeight;
+    });
+
+    // Page numbering in footer
+    const range = doc.bufferedPageRange();
+    for (let i = range.start; i < range.start + range.count; i++) {
+      doc.switchToPage(i);
+      doc.font('Helvetica').fontSize(7.5).fillColor('#94a3b8');
+      doc.text(
+        `Dokumen Inventaris BMN PSIMKG - Halaman ${i + 1} dari ${range.count}`,
+        36,
+        560,
+        { align: 'center', width: 770 }
+      );
+    }
+
+    doc.end();
+  } catch (error) {
+    console.error('Export PDF error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 router.get('/:id', async (req, res) => {
   try {
     const db = await getDb();

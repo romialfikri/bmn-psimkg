@@ -668,16 +668,16 @@ function App() {
   };
 
   const handleDeleteServis = async (id) => {
-    if (!window.confirm('Apakah Anda yakin ingin menghapus data pengajuan servis ini?')) return;
+    if (!window.confirm('Apakah Anda yakin ingin menghapus data pengajuan service ini?')) return;
     try {
       await axios.delete(apiUrl(`/api/servis/${id}`), {
         headers: { Authorization: `Bearer ${token}` }
       });
-      showToast('Data pengajuan servis berhasil dihapus', 'success');
+      showToast('Data pengajuan service berhasil dihapus', 'success');
       fetchServisData(servisStatusFilter, servisBidangFilter, servisSearch, servisPage);
     } catch (err) {
       console.error('Error deleting servis:', err);
-      showToast('Gagal menghapus data pengajuan servis', 'error');
+      showToast('Gagal menghapus data pengajuan service', 'error');
     }
   };
 
@@ -690,7 +690,7 @@ function App() {
       { id: 'geofisika', label: 'Geofisika' },
       { id: 'tatausaha', label: 'Tata Usaha' },
       { id: 'peminjaman', label: 'Barang Dipinjam' },
-      { id: 'servis', label: 'Pengajuan Servis' }
+      { id: 'servis', label: 'Pengajuan Service' }
     ];
 
     return (
@@ -736,7 +736,33 @@ function App() {
 
     return (
       <div>
-        <h2 className="dashboard-title">Dashboard BMN - PSIMKG</h2>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.25rem' }}>
+          <h2 className="dashboard-title" style={{ margin: 0 }}>Dashboard BMN - PSIMKG</h2>
+          <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            <a
+              href={apiUrl('/api/barang/export/excel?bidang=Semua')}
+              className="btn btn-sm"
+              download
+              target="_blank"
+              rel="noreferrer"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', textDecoration: 'none', backgroundColor: '#16a34a', color: '#fff', border: 'none', padding: '0.45rem 0.85rem', borderRadius: '6px', fontWeight: 600, fontSize: '0.85rem' }}
+              title="Download Seluruh Data BMN (Excel)"
+            >
+              📥 Download Semua (Excel)
+            </a>
+            <a
+              href={apiUrl('/api/barang/export/pdf?bidang=Semua')}
+              className="btn btn-sm"
+              download
+              target="_blank"
+              rel="noreferrer"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', textDecoration: 'none', backgroundColor: '#dc2626', color: '#fff', border: 'none', padding: '0.45rem 0.85rem', borderRadius: '6px', fontWeight: 600, fontSize: '0.85rem' }}
+              title="Download Seluruh Data BMN (PDF)"
+            >
+              📄 Download Semua (PDF)
+            </a>
+          </div>
+        </div>
 
         <div className="stats-grid">
           <div className="stat-card total">
@@ -748,8 +774,8 @@ function App() {
             <div className="stat-value" style={{ color: '#d97706' }}>{totalDipinjam || 0}</div>
             <div className="stat-sub">Klik untuk melihat detail &rarr;</div>
           </div>
-          <div className="stat-card sedang-servis" style={{ cursor: 'pointer' }} onClick={() => setCurrentPage('servis')} title="Lihat daftar pengajuan servis barang">
-            <h3>Barang Sedang Diservis</h3>
+          <div className="stat-card sedang-servis" style={{ cursor: 'pointer' }} onClick={() => setCurrentPage('servis')} title="Lihat daftar pengajuan service barang">
+            <h3>Barang Sedang Service</h3>
             <div className="stat-value" style={{ color: '#b45309' }}>{dashboardData?.totalSedangDiservis || 0}</div>
             <div className="stat-sub">Klik untuk melihat detail &rarr;</div>
           </div>
@@ -828,10 +854,32 @@ function App() {
         <h2 className="dashboard-title">Data BMN - {bidangName}</h2>
 
         <div className="controls-bar">
-          <div className="controls-left">
+          <div className="controls-left" style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
             {user && (user.role === 'admin' || user.bidang === bidangName) && (
               <button className="btn btn-primary" onClick={() => setIsAddModalOpen(true)}>+ Tambah Data</button>
             )}
+            <a
+              href={apiUrl(`/api/barang/export/excel?bidang=${encodeURIComponent(bidangName)}&search=${encodeURIComponent(search || '')}`)}
+              className="btn btn-sm"
+              download
+              target="_blank"
+              rel="noreferrer"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', textDecoration: 'none', backgroundColor: '#16a34a', color: '#fff', border: 'none', padding: '0.45rem 0.85rem', borderRadius: '6px', fontWeight: 600, fontSize: '0.85rem' }}
+              title="Download Data Barang Format Excel"
+            >
+              📥 Download Excel
+            </a>
+            <a
+              href={apiUrl(`/api/barang/export/pdf?bidang=${encodeURIComponent(bidangName)}&search=${encodeURIComponent(search || '')}`)}
+              className="btn btn-sm"
+              download
+              target="_blank"
+              rel="noreferrer"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', textDecoration: 'none', backgroundColor: '#dc2626', color: '#fff', border: 'none', padding: '0.45rem 0.85rem', borderRadius: '6px', fontWeight: 600, fontSize: '0.85rem' }}
+              title="Download Data Barang Format PDF"
+            >
+              📄 Download PDF
+            </a>
           </div>
           <div className="search-box">
             <form onSubmit={handleSearchSubmit} style={{display:'flex', gap:'0.5rem'}}>
@@ -1158,17 +1206,17 @@ function App() {
   const renderServisPage = () => {
     return (
       <div>
-        <h2 className="dashboard-title">Pengajuan Servis Barang BMN - PSIMKG</h2>
+        <h2 className="dashboard-title">Pengajuan Service Barang BMN - PSIMKG</h2>
 
         {/* Stats Grid */}
         <div className="stats-grid">
           <div className="stat-card servis">
-            <h3>Total Pengajuan Servis</h3>
+            <h3>Total Pengajuan Service</h3>
             <div className="stat-value">{servisStats.totalSemua || 0}</div>
-            <div className="stat-sub">Riwayat Servis BMN</div>
+            <div className="stat-sub">Riwayat Service BMN</div>
           </div>
           <div className="stat-card sedang-servis">
-            <h3>Sedang Diservis</h3>
+            <h3>Sedang Service</h3>
             <div className="stat-value" style={{ color: '#b45309' }}>
               {(servisStats.totalSedangDiservis || 0) + (servisStats.totalDiajukan || 0)}
             </div>
@@ -1177,7 +1225,7 @@ function App() {
             </div>
           </div>
           <div className="stat-card dikembalikan">
-            <h3>Selesai Diperbaiki</h3>
+            <h3>Selesai Service</h3>
             <div className="stat-value" style={{ color: '#16a34a' }}>
               {servisStats.totalSelesai || 0}
             </div>
@@ -1189,7 +1237,7 @@ function App() {
         <div className="controls-bar" style={{ flexWrap: 'wrap', gap: '0.75rem' }}>
           <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
             <button className="btn btn-primary" onClick={openAddServisModal}>
-              + Ajukan Servis Barang
+              + Ajukan Service Barang
             </button>
 
             {/* Filter Tabs */}
@@ -1203,7 +1251,7 @@ function App() {
                     setServisPage(1);
                   }}
                 >
-                  {st}
+                  {(st === 'Sedang Diservis' ? 'Sedang Service' : st)}
                   <span className="filter-count">
                     {st === 'Semua' && (servisStats.totalSemua || 0)}
                     {st === 'Diajukan' && (servisStats.totalDiajukan || 0)}
@@ -1269,12 +1317,12 @@ function App() {
                 <th>No BMN / NUP</th>
                 <th>Nama Barang & Bidang</th>
                 <th>Pengaju</th>
-                <th style={{ minWidth: '150px' }}>Tanggal Servis</th>
-                <th>Tempat Servis / Vendor</th>
+                <th style={{ minWidth: '150px' }}>Tanggal Service</th>
+                <th>Tempat Service / Vendor</th>
                 <th>Keluhan / Kerusakan</th>
                 <th>Biaya</th>
                 <th>Status</th>
-                <th>Hasil Servis</th>
+                <th>Hasil Service</th>
                 <th>Aksi</th>
               </tr>
             </thead>
@@ -1282,7 +1330,7 @@ function App() {
               {servisData.length === 0 ? (
                 <tr>
                   <td colSpan="12" className="empty-state">
-                    Belum ada data pengajuan servis barang.
+                    Belum ada data pengajuan service barang.
                   </td>
                 </tr>
               ) : (
@@ -1355,7 +1403,7 @@ function App() {
                       <td>
                         <span className={`status-badge ${statusClass}`}>
                           <span className="status-dot"></span>
-                          {item.status}
+                          {item.status === 'Sedang Diservis' ? 'Sedang Service' : item.status}
                         </span>
                       </td>
                       <td>
@@ -1867,7 +1915,7 @@ function App() {
       <div className="modal-overlay" onClick={() => setIsAddServisModalOpen(false)}>
         <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '640px' }}>
           <div className="modal-header">
-            <h2>Form Pengajuan Servis Barang BMN</h2>
+            <h2>Form Pengajuan Service Barang BMN</h2>
             <button type="button" className="close-btn" onClick={() => setIsAddServisModalOpen(false)}>&times;</button>
           </div>
           <form onSubmit={handleAddServisSubmit} className="bmn-form">
@@ -1961,7 +2009,7 @@ function App() {
 
             <div className="form-row">
               <div className="form-group">
-                <label>Nama Pengaju / Pemohon Servis *</label>
+                <label>Nama Pengaju / Pemohon Service *</label>
                 <input
                   type="text"
                   required
@@ -1985,7 +2033,7 @@ function App() {
             <div className="form-row" style={{ background: '#f0f9ff', padding: '0.85rem', borderRadius: '8px', border: '1px solid #bae6fd', marginBottom: '1rem' }}>
               <div className="form-group" style={{ margin: 0 }}>
                 <label style={{ color: '#0369a1', fontWeight: 600 }}>
-                  📅 Tanggal Barang Keluar (Servis) *
+                  📅 Tanggal Barang Keluar (Service) *
                 </label>
                 <input
                   type="date"
@@ -1993,7 +2041,7 @@ function App() {
                   value={addServisForm.tanggal_keluar}
                   onChange={e => setAddServisForm({ ...addServisForm, tanggal_keluar: e.target.value })}
                 />
-                <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Tanggal barang diserahkan/keluar untuk diservis</span>
+                <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Tanggal barang diserahkan/keluar untuk diservice</span>
               </div>
               <div className="form-group" style={{ margin: 0 }}>
                 <label style={{ color: '#16a34a', fontWeight: 600 }}>
@@ -2010,7 +2058,7 @@ function App() {
 
             <div className="form-row">
               <div className="form-group">
-                <label>Tempat Servis / Vendor / Teknisi</label>
+                <label>Tempat Service / Vendor / Teknisi</label>
                 <input
                   type="text"
                   placeholder="Contoh: Service Center Resmi / Bengkel Kalibrasi"
@@ -2019,7 +2067,7 @@ function App() {
                 />
               </div>
               <div className="form-group">
-                <label>Estimasi Biaya Servis (Rp)</label>
+                <label>Estimasi Biaya Service (Rp)</label>
                 <input
                   type="number"
                   placeholder="0"
@@ -2065,7 +2113,7 @@ function App() {
                 Batal
               </button>
               <button type="submit" className="btn btn-primary" disabled={isSubmittingServis}>
-                {isSubmittingServis ? 'Menyimpan...' : 'Ajukan Servis'}
+                {isSubmittingServis ? 'Menyimpan...' : 'Ajukan Service'}
               </button>
             </div>
           </form>
@@ -2081,7 +2129,7 @@ function App() {
       <div className="modal-overlay" onClick={() => setIsUpdateServisModalOpen(false)}>
         <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '560px' }}>
           <div className="modal-header">
-            <h2>Update Status & Pengembalian Servis</h2>
+            <h2>Update Status & Pengembalian Service</h2>
             <button type="button" className="close-btn" onClick={() => setIsUpdateServisModalOpen(false)}>&times;</button>
           </div>
           <form onSubmit={handleUpdateServisSubmit} className="bmn-form">
@@ -2092,12 +2140,12 @@ function App() {
               <div style={{ fontSize: '0.85rem', color: 'var(--text-light)', marginTop: '0.25rem', lineHeight: '1.6' }}>
                 <div><strong>No BMN:</strong> {selectedServisItem.no_bmn || '-'} {selectedServisItem.nup ? `(NUP: ${selectedServisItem.nup})` : ''} | <strong>Bidang:</strong> {selectedServisItem.bidang}</div>
                 <div><strong>Pengaju:</strong> {selectedServisItem.nama_pengaju}</div>
-                <div><strong>Tanggal Keluar Servis:</strong> {formatDate(selectedServisItem.tanggal_keluar)}</div>
+                <div><strong>Tanggal Keluar Service:</strong> {formatDate(selectedServisItem.tanggal_keluar)}</div>
               </div>
             </div>
 
             <div className="form-group">
-              <label>Status Servis *</label>
+              <label>Status Service *</label>
               <select
                 value={updateServisForm.status}
                 onChange={e => {
@@ -2110,7 +2158,7 @@ function App() {
                 }}
               >
                 <option value="Diajukan">Diajukan (Menunggu Konfirmasi / Jadwal Keluar)</option>
-                <option value="Sedang Diservis">Sedang Diservis (Dalam Pengerjaan)</option>
+                <option value="Sedang Diservis">Sedang Service (Dalam Pengerjaan)</option>
                 <option value="Selesai">Selesai (Barang Telah Selesai & Kembali)</option>
                 <option value="Dibatalkan">Dibatalkan</option>
               </select>
@@ -2134,7 +2182,7 @@ function App() {
             </div>
 
             <div className="form-group">
-              <label>Hasil Servis / Tindakan Perbaikan</label>
+              <label>Hasil Service / Tindakan Perbaikan</label>
               <textarea
                 rows="3"
                 placeholder="Contoh: Selesai diperbaiki, komponen sensor diganti baru, telah dilakukan uji fungsi dan kalibrasi..."
@@ -2144,7 +2192,7 @@ function App() {
             </div>
 
             <div className="form-group">
-              <label>Biaya Akhir / Aktual Servis (Rp)</label>
+              <label>Biaya Akhir / Aktual Service (Rp)</label>
               <input
                 type="number"
                 placeholder="0"

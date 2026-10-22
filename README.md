@@ -5,27 +5,30 @@ Aplikasi web untuk mengelola **Barang Milik Negara (BMN)** di lingkungan **PSIMK
 ## Fitur Utama
 
 - 🚪 **Akses Masuk (Login Gate)** - Tampilan login yang aman sebelum pengguna dapat masuk ke Dashboard dan menu aplikasi.
-- 📊 **Dashboard Ringkasan Eksekutif** - Total BMN, total barang dipinjam, total barang sedang diservis, sebaran BMN per bidang, dan 5 item terbaru.
+- 📊 **Dashboard Ringkasan Eksekutif** - Total BMN, total barang dipinjam, total barang sedang service, sebaran BMN per bidang, dan 5 item terbaru.
 - 📑 **Halaman Bidang BMN**:
   1. **Meteorologi**
   2. **Klimatologi**
   3. **Geofisika**
   4. **Tata Usaha**
+- 📥 **Fitur Download Data Barang (Excel & PDF)**:
+  - Download seluruh data BMN atau per-bidang dalam format **Microsoft Excel (.xlsx)** dengan penataan tabel dan styling warna resmi.
+  - Download dokumen resmi dalam format **PDF (.pdf)** lengkap dengan Kop Surat resmi BMKG - PSIMKG, tabel inventaris, dan penomoran halaman.
 - 🤝 **Halaman Peminjaman Barang (Barang Dipinjam)**:
   - Pencatatan peminjaman barang inventaris atau manual.
   - **Fitur Dipinjamkan Oleh Siapa** (mencatat identitas petugas yang meminjamkan barang).
   - Status aktif ("Sedang Dipinjam") dan riwayat ("Dikembalikan").
   - Tombol aksi cepat pengembalian barang beserta tanggal dan catatan pengembalian.
-- 🛠️ **Halaman Pengajuan Servis Barang BMN**:
-  - Formulir pengajuan perbaikan / servis barang BMN.
-  - **Fitur Tanggal Barang Keluar**: mencatat tanggal barang keluar / diserahkan untuk diservis.
+- 🛠️ **Halaman Pengajuan Service Barang BMN**:
+  - Formulir pengajuan perbaikan / service barang BMN.
+  - **Fitur Tanggal Barang Keluar**: mencatat tanggal barang keluar / diserahkan untuk diservice.
   - **Fitur Tanggal Barang Dikembalikan**: mencatat tanggal estimasi kembali serta tanggal aktual barang diterima kembali setelah perbaikan.
-  - Informasi tempat servis/vendor, keluhan kerusakan, estimasi dan biaya riil perbaikan, serta foto barang.
-  - Alur status lengkap: `Diajukan` ➜ `Sedang Diservis` ➜ `Selesai` / `Dibatalkan` disertai catatan hasil servis.
+  - Informasi tempat service/vendor, keluhan kerusakan, estimasi dan biaya riil perbaikan, serta foto barang.
+  - Alur status lengkap: `Diajukan` ➜ `Sedang Service` ➜ `Selesai` / `Dibatalkan` disertai catatan hasil service.
 - 🔐 **Autentikasi Berbasis Peran (RBAC)**:
   - Login wajib untuk mengakses menu aplikasi.
   - Operator bidang hanya mengelola data bidang masing-masing.
-  - **Hanya Administrator** yang berhak menghapus data BMN, data peminjaman, dan riwayat servis.
+  - **Hanya Administrator** yang berhak menghapus data BMN, data peminjaman, dan riwayat service.
 - 🏷️ **Field Data Lengkap**: No BMN, NUP, Nama Barang, Bidang, Tahun, Lokasi Ruangan, Foto, Keterangan, Tanggal Upload.
 - 🔍 **Fitur Perbesar Foto (Lightbox)** - Klik foto thumbnail pada tabel untuk melihat gambar ukuran penuh.
 - 🔎 **Pencarian & Pagination** - Pencarian real-time berdasarkan nama barang, No BMN, peminjam, petugas, vendor, atau keluhan.
@@ -76,15 +79,18 @@ git pull origin main
 
 ### 2. Install dependencies & build frontend
 ```bash
-npm install
-npm run build
+# Install dependencies backend (termasuk exceljs dan pdfkit)
+cd backend && npm install && cd ..
+
+# Install dependencies frontend & build
+cd frontend && npm install && npm run build && cd ..
 ```
 
 ### 3. Jalankan / Restart layanan PM2
 ```bash
-pm2 start ecosystem.config.cjs
-# atau jika sudah pernah jalan:
 pm2 restart ecosystem.config.cjs
+# atau jika baru pertama kali:
+# pm2 start ecosystem.config.cjs
 pm2 save
 ```
 
@@ -92,20 +98,13 @@ Layanan PM2 yang berjalan:
 - `bmn-api`: Backend API Express (Port 8022)
 - `bmn-web`: Frontend Web Static Server (Port 3022)
 
-### 4. Konfigurasi Apache Reverse Proxy
-Salin konfigurasi `apache-bmn.conf`:
+### 4. Konfigurasi Apache Reverse Proxy (Sekali Saja saat Awal Setup)
 ```bash
 sudo cp apache-bmn.conf /etc/apache2/sites-available/bmn.conf
 sudo a2enmod proxy proxy_http rewrite headers
 sudo a2ensite bmn.conf
-sudo systemctl restart apache2
+sudo systemctl reload apache2
 ```
-
-Aplikasi dapat diakses melalui:
-- **http://[domain-atau-ip]/bmn** (Production di server)
-- **http://localhost:3022** (Lokal)
-
----
-
-## Kontak
-Dikelola oleh **PSIMKG - Pusat Standardisasi Instrumen Meteorologi Klimatologi dan Geofisika**
+Akses live di server:
+- Web: `http://<IP-SERVER>/bmn`
+- API: `http://<IP-SERVER>/bmn/api`
