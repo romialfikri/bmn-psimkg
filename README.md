@@ -11,9 +11,10 @@ Aplikasi web untuk mengelola **Barang Milik Negara (BMN)** di lingkungan **PSIMK
   2. **Klimatologi**
   3. **Geofisika**
   4. **Tata Usaha**
-- 📥 **Fitur Download Data Barang (Excel & PDF)**:
-  - Download seluruh data BMN atau per-bidang dalam format **Microsoft Excel (.xlsx)** dengan penataan tabel dan styling warna resmi.
-  - Download dokumen resmi dalam format **PDF (.pdf)** lengkap dengan Kop Surat resmi BMKG - PSIMKG, tabel inventaris, dan penomoran halaman.
+- 📥 **Fitur Download Data Laporan (Excel & PDF - Khusus Administrator)**:
+  - **Data Barang BMN**: Download seluruh data atau per-bidang dalam format Microsoft Excel (.xlsx) dan PDF resmi ber-kop PSIMKG.
+  - **Data Barang Dipinjam (Peminjaman)**: Download riwayat & daftar peminjaman aktif barang BMN ke Excel dan PDF.
+  - **Data Pengajuan Service**: Download daftar & riwayat perbaikan alat BMN ke Excel dan PDF.
 - 🤝 **Halaman Peminjaman Barang (Barang Dipinjam)**:
   - Pencatatan peminjaman barang inventaris atau manual.
   - **Fitur Dipinjamkan Oleh Siapa** (mencatat identitas petugas yang meminjamkan barang).
@@ -28,7 +29,7 @@ Aplikasi web untuk mengelola **Barang Milik Negara (BMN)** di lingkungan **PSIMK
 - 🔐 **Autentikasi Berbasis Peran (RBAC)**:
   - Login wajib untuk mengakses menu aplikasi.
   - Operator bidang hanya mengelola data bidang masing-masing.
-  - **Hanya Administrator** yang berhak menghapus data BMN, data peminjaman, dan riwayat service.
+  - **Hanya Administrator** yang berhak mendownload dokumen Excel & PDF, menghapus data BMN, data peminjaman, dan riwayat service.
 - 🏷️ **Field Data Lengkap**: No BMN, NUP, Nama Barang, Bidang, Tahun, Lokasi Ruangan, Foto, Keterangan, Tanggal Upload.
 - 🔍 **Fitur Perbesar Foto (Lightbox)** - Klik foto thumbnail pada tabel untuk melihat gambar ukuran penuh.
 - 🔎 **Pencarian & Pagination** - Pencarian real-time berdasarkan nama barang, No BMN, peminjam, petugas, vendor, atau keluhan.
@@ -37,13 +38,13 @@ Aplikasi web untuk mengelola **Barang Milik Negara (BMN)** di lingkungan **PSIMK
 
 ## Akun Pengguna (Login)
 
-| Username | Password | Role | Bidang Akses |
-|---|---|---|---|
-| `admin` | `admin123` | **Administrator** | Semua Bidang (Bisa Tambah & Hapus) |
-| `meteorologi` | `meteorologi123` | Operator | Meteorologi |
-| `klimatologi` | `klimatologi123` | Operator | Klimatologi |
-| `geofisika` | `geofisika123` | Operator | Geofisika |
-| `tatausaha` | `tatausaha123` | Operator | Tata Usaha |
+| Username | Password | Role | Bidang Akses | Hak Download & Hapus |
+|---|---|---|---|---|
+| `admin` | `admin123` | **Administrator** | Semua Bidang | **Ya (Full Akses)** |
+| `meteorologi` | `meteorologi123` | Operator | Meteorologi | Tidak |
+| `klimatologi` | `klimatologi123` | Operator | Klimatologi | Tidak |
+| `geofisika` | `geofisika123` | Operator | Geofisika | Tidak |
+| `tatausaha` | `tatausaha123` | Operator | Tata Usaha | Tidak |
 
 ---
 

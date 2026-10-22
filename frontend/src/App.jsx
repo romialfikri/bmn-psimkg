@@ -1002,6 +1002,33 @@ function App() {
             )}
 
             {/* Filter Tabs Status */}
+            {user && user.role === 'admin' && (
+              <>
+                <a
+                  href={apiUrl(`/api/peminjaman/export/excel?status=${encodeURIComponent(peminjamanStatusFilter)}&bidang=${encodeURIComponent(peminjamanBidangFilter)}&search=${encodeURIComponent(peminjamanSearch || '')}&token=${token || ''}`)}
+                  className="btn btn-sm"
+                  download
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', textDecoration: 'none', backgroundColor: '#16a34a', color: '#fff', border: 'none', padding: '0.45rem 0.85rem', borderRadius: '6px', fontWeight: 600, fontSize: '0.85rem' }}
+                  title="Download Data Peminjaman Format Excel (Khusus Admin)"
+                >
+                  📥 Download Excel
+                </a>
+                <a
+                  href={apiUrl(`/api/peminjaman/export/pdf?status=${encodeURIComponent(peminjamanStatusFilter)}&bidang=${encodeURIComponent(peminjamanBidangFilter)}&search=${encodeURIComponent(peminjamanSearch || '')}&token=${token || ''}`)}
+                  className="btn btn-sm"
+                  download
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', textDecoration: 'none', backgroundColor: '#dc2626', color: '#fff', border: 'none', padding: '0.45rem 0.85rem', borderRadius: '6px', fontWeight: 600, fontSize: '0.85rem' }}
+                  title="Download Data Peminjaman Format PDF (Khusus Admin)"
+                >
+                  📄 Download PDF
+                </a>
+              </>
+            )}
+
             <div className="filter-tabs">
               <button
                 className={`filter-tab ${peminjamanStatusFilter === 'Semua' ? 'active' : ''}`}
@@ -1245,6 +1272,32 @@ function App() {
             <button className="btn btn-primary" onClick={openAddServisModal}>
               + Ajukan Service Barang
             </button>
+            {user && user.role === 'admin' && (
+              <>
+                <a
+                  href={apiUrl(`/api/servis/export/excel?status=${encodeURIComponent(servisStatusFilter)}&bidang=${encodeURIComponent(servisBidangFilter)}&search=${encodeURIComponent(servisSearch || '')}&token=${token || ''}`)}
+                  className="btn btn-sm"
+                  download
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', textDecoration: 'none', backgroundColor: '#16a34a', color: '#fff', border: 'none', padding: '0.45rem 0.85rem', borderRadius: '6px', fontWeight: 600, fontSize: '0.85rem' }}
+                  title="Download Data Service Format Excel (Khusus Admin)"
+                >
+                  📥 Download Excel
+                </a>
+                <a
+                  href={apiUrl(`/api/servis/export/pdf?status=${encodeURIComponent(servisStatusFilter)}&bidang=${encodeURIComponent(servisBidangFilter)}&search=${encodeURIComponent(servisSearch || '')}&token=${token || ''}`)}
+                  className="btn btn-sm"
+                  download
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', textDecoration: 'none', backgroundColor: '#dc2626', color: '#fff', border: 'none', padding: '0.45rem 0.85rem', borderRadius: '6px', fontWeight: 600, fontSize: '0.85rem' }}
+                  title="Download Data Service Format PDF (Khusus Admin)"
+                >
+                  📄 Download PDF
+                </a>
+              </>
+            )}
 
             {/* Filter Tabs */}
             <div className="filter-tabs">
