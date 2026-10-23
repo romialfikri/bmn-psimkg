@@ -667,6 +667,48 @@ function App() {
     }
   };
 
+    const handleApprovePeminjaman = async (id, action) => {
+    let catatan = '';
+    if (action === 'reject') {
+      const reason = window.prompt('Masukkan alasan penolakan peminjaman (opsional):');
+      if (reason === null) return;
+      catatan = reason;
+    } else {
+      if (!window.confirm('Apakah Anda yakin ingin MENYETUJUI peminjaman barang ini?')) return;
+    }
+    try {
+      const res = await axios.put(apiUrl(`/api/peminjaman/${id}/approve`), { action, catatan }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      showToast(res.data.message || 'Status peminjaman berhasil diperbarui', 'success');
+      fetchPeminjamanData(peminjamanStatusFilter, peminjamanBidangFilter, peminjamanSearch, peminjamanPage);
+    } catch (err) {
+      console.error('Error approving peminjaman:', err);
+      showToast(err.response?.data?.error || 'Gagal memproses persetujuan peminjaman', 'error');
+    }
+  };
+
+  const handleApproveServis = async (id, action) => {
+    let catatan = '';
+    if (action === 'reject') {
+      const reason = window.prompt('Masukkan alasan penolakan pengajuan service (opsional):');
+      if (reason === null) return;
+      catatan = reason;
+    } else {
+      if (!window.confirm('Apakah Anda yakin ingin MENYETUJUI pengajuan service barang ini?')) return;
+    }
+    try {
+      const res = await axios.put(apiUrl(`/api/servis/${id}/approve`), { action, catatan }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      showToast(res.data.message || 'Status service berhasil diperbarui', 'success');
+      fetchServisData(servisStatusFilter, servisBidangFilter, servisSearch, servisPage);
+    } catch (err) {
+      console.error('Error approving servis:', err);
+      showToast(err.response?.data?.error || 'Gagal memproses persetujuan service', 'error');
+    }
+  };
+
   const handleDeleteServis = async (id) => {
     if (!window.confirm('Apakah Anda yakin ingin menghapus data pengajuan service ini?')) return;
     try {
@@ -1030,24 +1072,22 @@ function App() {
             )}
 
             <div className="filter-tabs">
-              <button
-                className={`filter-tab ${peminjamanStatusFilter === 'Semua' ? 'active' : ''}`}
-                onClick={() => { setPeminjamanStatusFilter('Semua'); setPeminjamanPage(1); }}
-              >
-                Semua <span className="filter-count">{peminjamanStats.totalSemua}</span>
-              </button>
-              <button
-                className={`filter-tab ${peminjamanStatusFilter === 'Dipinjam' ? 'active' : ''}`}
-                onClick={() => { setPeminjamanStatusFilter('Dipinjam'); setPeminjamanPage(1); }}
-              >
-                Sedang Dipinjam <span className="filter-count">{peminjamanStats.totalDipinjam}</span>
-              </button>
-              <button
-                className={`filter-tab ${peminjamanStatusFilter === 'Dikembalikan' ? 'active' : ''}`}
-                onClick={() => { setPeminjamanStatusFilter('Dikembalikan'); setPeminjamanPage(1); }}
-              >
-                Sudah Kembali <span className="filter-count">{peminjamanStats.totalDikembalikan}</span>
-              </button>
+              {['Semua', 'Menunggu Persetujuan', 'Dipinjam', 'Dikembalikan', 'Ditolak'].map(st => (
+                <button
+                  key={st}
+                  className={`filter-tab ${peminjamanStatusFilter === st ? 'active' : ''}`}
+                  onClick={() => { setPeminjamanStatusFilter(st); setPeminjamanPage(1); }}
+                >
+                  {st === 'Menunggu Persetujuan' ? 'Menunggu Approval' : (st === 'Dipinjam' ? 'Sedang Dipinjam' : (st === 'Dikembalikan' ? 'Sudah Kembali' : st))}
+                  <span className="filter-count">
+                    {st === 'Semua' && (peminjamanStats.totalSemua || 0)}
+                    {st === 'Menunggu Persetujuan' && (peminjamanStats.totalMenunggu || 0)}
+                    {st === 'Dipinjam' && (peminjamanStats.totalDipinjam || 0)}
+                    {st === 'Dikembalikan' && (peminjamanStats.totalDikembalikan || 0)}
+                    {st === 'Ditolak' && (peminjamanStats.totalDitolak || 0)}
+                  </span>
+                </button>
+              ))}
             </div>
           </div>
 
@@ -1169,9 +1209,9 @@ function App() {
                         )}
                       </td>
                       <td>
-                        <span className={`status-badge ${isDipinjam ? 'dipinjam' : 'dikembalikan'}`}>
-                          <span className="status-dot"></span>
-                          {isDipinjam ? 'Dipinjam' : 'Dikembalikan'}
+                        <span className={`status-badge ${item.status === 'Dipinjam' ? 'dipinjam' : (item.status === 'Dikembalikan' ? 'dikembalikan' : 'diajukan')}`} style={item.status === 'Menunggu Persetujuan' ? { backgroundColor: '#fef3c7', color: '#b45309', border: '1px solid #fde68a' } : (item.status === 'Ditolak' ? { backgroundColor: '#fee2e2', color: '#b91c1c', border: '1px solid #fca5a5' } : {})}>
+                          <span className="status-dot" style={item.status === 'Menunggu Persetujuan' ? { backgroundColor: '#f59e0b' } : (item.status === 'Ditolak' ? { backgroundColor: '#ef4444' } : {})}></span>
+                          {item.status === 'Menunggu Persetujuan' ? 'Menunggu Approval' : item.status}
                         </span>
                       </td>
                       <td>
@@ -1184,10 +1224,34 @@ function App() {
                       {showAksi && (
                         <td>
                           <div style={{ display: 'flex', gap: '0.4rem', flexDirection: 'column' }}>
-                            {isDipinjam && (
+                            {item.status === 'Menunggu Persetujuan' && (
+                              user?.role === 'admin' ? (
+                                <div style={{ display: 'flex', gap: '0.35rem', flexDirection: 'column' }}>
+                                  <button
+                                    className="btn btn-sm"
+                                    style={{ backgroundColor: '#16a34a', color: '#fff', border: 'none', padding: '0.35rem 0.6rem', fontSize: '0.78rem', fontWeight: 600, borderRadius: '4px' }}
+                                    onClick={() => handleApprovePeminjaman(item.id, 'approve')}
+                                    title="Setujui Peminjaman Barang"
+                                  >
+                                    ✓ Setujui
+                                  </button>
+                                  <button
+                                    className="btn btn-sm btn-danger"
+                                    style={{ padding: '0.35rem 0.6rem', fontSize: '0.78rem', borderRadius: '4px' }}
+                                    onClick={() => handleApprovePeminjaman(item.id, 'reject')}
+                                    title="Tolak Peminjaman Barang"
+                                  >
+                                    ✗ Tolak
+                                  </button>
+                                </div>
+                              ) : (
+                                <span style={{ fontSize: '0.78rem', color: '#b45309', fontStyle: 'italic' }}>Menunggu Approval</span>
+                              )
+                            )}
+                            {item.status === 'Dipinjam' && (
                               <button
                                 className="btn btn-sm btn-primary"
-                                style={{ backgroundColor: '#28a745', borderColor: '#28a745' }}
+                                style={{ backgroundColor: '#28a745', borderColor: '#28a745', whiteSpace: 'nowrap', fontSize: '0.78rem' }}
                                 onClick={() => openReturnModal(item)}
                               >
                                 ✓ Kembalikan
@@ -1196,6 +1260,7 @@ function App() {
                             {user?.role === 'admin' && (
                               <button
                                 className="btn btn-sm btn-danger"
+                                style={{ whiteSpace: 'nowrap', fontSize: '0.78rem' }}
                                 onClick={() => handleDeletePinjam(item.id)}
                               >
                                 Hapus
@@ -1301,7 +1366,7 @@ function App() {
 
             {/* Filter Tabs */}
             <div className="filter-tabs">
-              {['Semua', 'Diajukan', 'Sedang Diservis', 'Selesai'].map(st => (
+              {['Semua', 'Diajukan', 'Sedang Diservis', 'Selesai', 'Ditolak'].map(st => (
                 <button
                   key={st}
                   className={`filter-tab ${servisStatusFilter === st ? 'active' : ''}`}
@@ -1310,12 +1375,13 @@ function App() {
                     setServisPage(1);
                   }}
                 >
-                  {(st === 'Sedang Diservis' ? 'Sedang Service' : st)}
+                  {st === 'Diajukan' ? 'Menunggu Approval' : (st === 'Sedang Diservis' ? 'Sedang Service' : st)}
                   <span className="filter-count">
                     {st === 'Semua' && (servisStats.totalSemua || 0)}
                     {st === 'Diajukan' && (servisStats.totalDiajukan || 0)}
                     {st === 'Sedang Diservis' && (servisStats.totalSedangDiservis || 0)}
                     {st === 'Selesai' && (servisStats.totalSelesai || 0)}
+                    {st === 'Ditolak' && (servisStats.totalDitolak || 0)}
                   </span>
                 </button>
               ))}
@@ -1460,9 +1526,9 @@ function App() {
                         {item.biaya_servis > 0 ? formatRupiah(item.biaya_servis) : '-'}
                       </td>
                       <td>
-                        <span className={`status-badge ${statusClass}`}>
-                          <span className="status-dot"></span>
-                          {item.status === 'Sedang Diservis' ? 'Sedang Service' : item.status}
+                        <span className={`status-badge ${statusClass}`} style={item.status === 'Diajukan' ? { backgroundColor: '#fef3c7', color: '#b45309', border: '1px solid #fde68a' } : (item.status === 'Ditolak' ? { backgroundColor: '#fee2e2', color: '#b91c1c', border: '1px solid #fca5a5' } : {})}>
+                          <span className="status-dot" style={item.status === 'Diajukan' ? { backgroundColor: '#f59e0b' } : (item.status === 'Ditolak' ? { backgroundColor: '#ef4444' } : {})}></span>
+                          {item.status === 'Diajukan' ? 'Menunggu Approval' : (item.status === 'Sedang Diservis' ? 'Sedang Service' : item.status)}
                         </span>
                       </td>
                       <td>
@@ -1470,15 +1536,40 @@ function App() {
                           {item.hasil_servis || '-'}
                         </div>
                       </td>
-                      <td>
+                                            <td>
                         <div style={{ display: 'flex', gap: '0.4rem', flexDirection: 'column' }}>
-                          <button
-                            className="btn btn-sm btn-primary"
-                            style={{ whiteSpace: 'nowrap', fontSize: '0.78rem' }}
-                            onClick={() => openUpdateServisModal(item)}
-                          >
-                            Update Status
-                          </button>
+                          {item.status === 'Diajukan' ? (
+                            user?.role === 'admin' ? (
+                              <div style={{ display: 'flex', gap: '0.35rem', flexDirection: 'column' }}>
+                                <button
+                                  className="btn btn-sm"
+                                  style={{ backgroundColor: '#16a34a', color: '#fff', border: 'none', padding: '0.35rem 0.6rem', fontSize: '0.78rem', fontWeight: 600, borderRadius: '4px', whiteSpace: 'nowrap' }}
+                                  onClick={() => handleApproveServis(item.id, 'approve')}
+                                  title="Setujui Pengajuan Service"
+                                >
+                                  ✓ Setujui Service
+                                </button>
+                                <button
+                                  className="btn btn-sm btn-danger"
+                                  style={{ padding: '0.35rem 0.6rem', fontSize: '0.78rem', borderRadius: '4px', whiteSpace: 'nowrap' }}
+                                  onClick={() => handleApproveServis(item.id, 'reject')}
+                                  title="Tolak Pengajuan Service"
+                                >
+                                  ✗ Tolak
+                                </button>
+                              </div>
+                            ) : (
+                              <span style={{ fontSize: '0.78rem', color: '#b45309', fontStyle: 'italic' }}>Menunggu Approval Admin</span>
+                            )
+                          ) : (
+                            <button
+                              className="btn btn-sm btn-primary"
+                              style={{ whiteSpace: 'nowrap', fontSize: '0.78rem' }}
+                              onClick={() => openUpdateServisModal(item)}
+                            >
+                              Update Status
+                            </button>
+                          )}
                           {user?.role === 'admin' && (
                             <button
                               className="btn btn-sm btn-danger"

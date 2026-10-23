@@ -115,7 +115,7 @@ router.get('/', async (req, res) => {
     countStmt.free();
 
     // Query data
-    const dataSql = `SELECT * FROM peminjaman ${whereClause} ORDER BY CASE WHEN status = 'Dipinjam' THEN 0 ELSE 1 END, id DESC LIMIT ? OFFSET ?`;
+    const dataSql = `SELECT * FROM peminjaman ${whereClause} ORDER BY CASE WHEN status = 'Menunggu Persetujuan' THEN 1 WHEN status = 'Dipinjam' THEN 2 WHEN status = 'Ditolak' THEN 3 ELSE 4 END, id DESC LIMIT ? OFFSET ?`;
     const dataStmt = db.prepare(dataSql);
     dataStmt.bind([...queryParams, limit, offset]);
     const data = [];
@@ -125,11 +125,17 @@ router.get('/', async (req, res) => {
     dataStmt.free();
 
     // Stats
+    const totalMenungguRes = db.exec("SELECT COUNT(*) as total FROM peminjaman WHERE status = 'Menunggu Persetujuan'");
+    const totalMenunggu = totalMenungguRes.length > 0 ? totalMenungguRes[0].values[0][0] : 0;
+
     const totalDipinjamResult = db.exec("SELECT COUNT(*) as total FROM peminjaman WHERE status = 'Dipinjam'");
     const totalDipinjam = totalDipinjamResult.length > 0 ? totalDipinjamResult[0].values[0][0] : 0;
 
     const totalDikembalikanResult = db.exec("SELECT COUNT(*) as total FROM peminjaman WHERE status = 'Dikembalikan'");
     const totalDikembalikan = totalDikembalikanResult.length > 0 ? totalDikembalikanResult[0].values[0][0] : 0;
+
+    const totalDitolakResult = db.exec("SELECT COUNT(*) as total FROM peminjaman WHERE status = 'Ditolak'");
+    const totalDitolak = totalDitolakResult.length > 0 ? totalDitolakResult[0].values[0][0] : 0;
 
     const totalPages = Math.ceil(total / limit) || 1;
 
@@ -141,9 +147,11 @@ router.get('/', async (req, res) => {
       limit,
       totalPages,
       stats: {
-        totalSemua: totalDipinjam + totalDikembalikan,
+        totalSemua: totalMenunggu + totalDipinjam + totalDikembalikan + totalDitolak,
+        totalMenunggu,
         totalDipinjam,
-        totalDikembalikan
+        totalDikembalikan,
+        totalDitolak
       }
     });
   } catch (error) {
@@ -526,7 +534,7 @@ router.post('/', authenticateToken, upload.single('foto_barang'), async (req, re
         barang_id, no_bmn, nup, nama_barang, bidang, nama_peminjam,
         kontak_peminjam, dipinjamkan_oleh, tgl_pinjam,
         tgl_kembali_rencana, status, keperluan, catatan, foto_barang
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Dipinjam', ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, (req.user && req.user.role === 'admin' ? 'Dipinjam' : 'Menunggu Persetujuan'), ?, ?, ?)`,
       [
         barang_id ? parseInt(barang_id) : null,
         no_bmn || null,
@@ -575,6 +583,45 @@ router.post('/', authenticateToken, upload.single('foto_barang'), async (req, re
 });
 
 // PUT /api/peminjaman/:id/kembali — Tandai barang telah dikembalikan (Authenticated)
+
+// PUT /api/peminjaman/:id/approve — Setujui atau Tolak Peminjaman (ADMIN ONLY)
+router.put('/:id/approve', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const db = await getDb();
+    const id = req.params.id;
+    const { action, catatan } = req.body; // action: 'approve' | 'reject'
+
+    const existing = resultToArray(db.exec('SELECT * FROM peminjaman WHERE id = ?', [id]));
+    if (existing.length === 0) {
+      return res.status(404).json({ success: false, error: 'Data peminjaman tidak ditemukan' });
+    }
+
+    const item = existing[0];
+    let newStatus = action === 'approve' ? 'Dipinjam' : 'Ditolak';
+    let newCatatan = item.catatan || '';
+
+    if (catatan && catatan.trim()) {
+      newCatatan = newCatatan ? `${newCatatan} | [Catatan Admin: ${catatan.trim()}]` : `[Catatan Admin: ${catatan.trim()}]`;
+    }
+
+    db.run(
+      'UPDATE peminjaman SET status = ?, catatan = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      [newStatus, newCatatan, id]
+    );
+    saveDb();
+
+    res.json({
+      success: true,
+      message: action === 'approve'
+        ? `Peminjaman barang "${item.nama_barang}" berhasil DISETUJUI oleh Admin.`
+        : `Peminjaman barang "${item.nama_barang}" telah DITOLAK oleh Admin.`,
+      status: newStatus
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 router.put('/:id/kembali', authenticateToken, async (req, res) => {
   try {
     const db = await getDb();

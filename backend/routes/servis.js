@@ -122,9 +122,10 @@ router.get('/', async (req, res) => {
     const dataSql = `SELECT * FROM servis ${whereClause} 
       ORDER BY 
         CASE 
-          WHEN status = 'Sedang Diservis' THEN 1
-          WHEN status = 'Diajukan' THEN 2
-          ELSE 3
+          WHEN status = 'Diajukan' THEN 1
+          WHEN status IN ('Sedang Service', 'Sedang Diservis') THEN 2
+          WHEN status = 'Ditolak' THEN 3
+          ELSE 4
         END, 
         id DESC 
       LIMIT ? OFFSET ?`;
@@ -141,11 +142,14 @@ router.get('/', async (req, res) => {
     const diajukanRes = db.exec("SELECT COUNT(*) as total FROM servis WHERE status = 'Diajukan'");
     const totalDiajukan = diajukanRes.length > 0 ? diajukanRes[0].values[0][0] : 0;
 
-    const sedangRes = db.exec("SELECT COUNT(*) as total FROM servis WHERE status = 'Sedang Diservis'");
+    const sedangRes = db.exec("SELECT COUNT(*) as total FROM servis WHERE status IN ('Sedang Service', 'Sedang Diservis')");
     const totalSedangDiservis = sedangRes.length > 0 ? sedangRes[0].values[0][0] : 0;
 
     const selesaiRes = db.exec("SELECT COUNT(*) as total FROM servis WHERE status = 'Selesai'");
     const totalSelesai = selesaiRes.length > 0 ? selesaiRes[0].values[0][0] : 0;
+
+    const ditolakRes = db.exec("SELECT COUNT(*) as total FROM servis WHERE status = 'Ditolak'");
+    const totalDitolak = ditolakRes.length > 0 ? ditolakRes[0].values[0][0] : 0;
 
     const totalPages = Math.ceil(total / limit) || 1;
 
@@ -157,10 +161,11 @@ router.get('/', async (req, res) => {
       limit,
       totalPages,
       stats: {
-        totalSemua: totalDiajukan + totalSedangDiservis + totalSelesai,
+        totalSemua: totalDiajukan + totalSedangDiservis + totalSelesai + totalDitolak,
         totalDiajukan,
         totalSedangDiservis,
-        totalSelesai
+        totalSelesai,
+        totalDitolak
       }
     });
   } catch (error) {
@@ -620,6 +625,45 @@ router.post('/', authenticateToken, upload.single('foto_barang'), async (req, re
 });
 
 // PUT /api/servis/:id/status — Update status servis (misal: Sedang Diservis, Selesai, Dibatalkan)
+
+// PUT /api/servis/:id/approve — Setujui atau Tolak Pengajuan Service (ADMIN ONLY)
+router.put('/:id/approve', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const db = await getDb();
+    const id = req.params.id;
+    const { action, catatan } = req.body; // action: 'approve' | 'reject'
+
+    const existing = resultToArray(db.exec('SELECT * FROM servis WHERE id = ?', [id]));
+    if (existing.length === 0) {
+      return res.status(404).json({ success: false, error: 'Data pengajuan service tidak ditemukan' });
+    }
+
+    const item = existing[0];
+    let newStatus = action === 'approve' ? 'Sedang Service' : 'Ditolak';
+    let newHasil = item.hasil_servis || '';
+
+    if (catatan && catatan.trim()) {
+      newHasil = newHasil ? `${newHasil} | [Catatan Admin: ${catatan.trim()}]` : `[Catatan Admin: ${catatan.trim()}]`;
+    }
+
+    db.run(
+      'UPDATE servis SET status = ?, hasil_servis = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      [newStatus, newHasil, id]
+    );
+    saveDb();
+
+    res.json({
+      success: true,
+      message: action === 'approve'
+        ? `Pengajuan service barang "${item.nama_barang}" berhasil DISETUJUI oleh Admin.`
+        : `Pengajuan service barang "${item.nama_barang}" telah DITOLAK oleh Admin.`,
+      status: newStatus
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 router.put('/:id/status', authenticateToken, async (req, res) => {
   try {
     const db = await getDb();
