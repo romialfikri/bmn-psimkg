@@ -57,6 +57,14 @@ function proxyToBackend(req, res) {
   req.pipe(proxyReq, { end: true });
 }
 
+// Disable browser caching for SPA html and static files to ensure instant live updates
+app.use((req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  next();
+});
+
 // 1. Proxy API & Uploads (both /api and /bmn/api)
 app.use(['/api', '/bmn/api', '/uploads', '/bmn/uploads'], proxyToBackend);
 
